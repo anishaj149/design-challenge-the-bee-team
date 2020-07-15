@@ -1,0 +1,20 @@
+Primitives to use? 
+
+- HMAC
+- AEAD
+- Signing
+- Hashing 
+- Symmetric keys
+- Asymmetric Keys
+- RSA (we'll see ab this one later oml)
+- AES 
+    - CBC: XOR with IV first, and then 
+
+
+
+There is no security measures on:
+
+- fw_update
+- fw_protect
+
+    
