@@ -1,0 +1,36 @@
+Primitives to use? 
+
+- HMAC
+- AEAD
+- Signing
+- Hashing 
+- Symmetric keys
+- Asymmetric Keys
+- RSA (we'll see ab this one later oml)
+- AES 
+    - CBC: XOR with IV first, and then 
+- one-time pad
+
+
+There is no security measures on:
+
+- fw_update
+- fw_protect
+
+Our plan:
+
+Encryption:
+plaintext
+encrypt CBC (ciphertext)
+generate HMAC
+append to encryption
+encrypt CTR (ciphertext + HMAC)
+Caesar Cipher 26
+
+Decryption:
+Caesar Cipher 26
+decrypt CTR (ciphertext + HMAC)
+check HMAC
+decrypt CBC (ciphertext)
+
+Check version # (can't be an older version excluding 0)
