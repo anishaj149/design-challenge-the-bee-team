@@ -1,0 +1,18 @@
+Primitives to use? 
+
+- HMAC
+- AEAD
+- Signing
+- Hashing 
+- Symmetric keys
+- Asymmetric Keys
+- RSA (video)
+- AES 
+    - CBC (a block cipher): XOR with IV first, and then encrypt
+    
+Must add security measures to:
+
+- fw_update 
+- fw_protect
+
+    

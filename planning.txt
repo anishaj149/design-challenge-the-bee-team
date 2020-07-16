@@ -6,15 +6,13 @@ Primitives to use?
 - Hashing 
 - Symmetric keys
 - Asymmetric Keys
-- RSA (we'll see ab this one later oml)
+- RSA (video)
 - AES 
-    - CBC: XOR with IV first, and then 
+    - CBC (a block cipher): XOR with IV first, and then encrypt
+    
+Must add security measures to:
 
-
-
-There is no security measures on:
-
-- fw_update
+- fw_update 
 - fw_protect
 
     
