@@ -212,6 +212,7 @@ void load_firmware(void)
   } // while(1)
 }
 
+<<<<<<< HEAD
 // verify if the data was modified by calculating a new hmac and comparing it to the given hmac
 int verify_hmac(unsigned char *hmac, unsigned char *data, unsigned int data_len) {
     
@@ -230,6 +231,11 @@ int verify_hmac(unsigned char *hmac, unsigned char *data, unsigned int data_len)
     if (hmac == test_hmac) {
         return 1;
     }
+=======
+<<<<<<< HEAD
+=======
+int verify_hmac(uint32_t metadata, char data[]) {
+>>>>>>> 5230fb710ad94e83f3d4fdbb1c95e4aa230531f7
     
     return 0;  
 }
@@ -239,6 +245,7 @@ char decrypt_firmware(char data[]) {
     return data;
 }
 
+>>>>>>> 4a293a210e6cfb7db6f1e6e5d61815b70e96e69a
 
 /*
  * Program a stream of bytes to the flash.
