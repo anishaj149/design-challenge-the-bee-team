@@ -24,7 +24,7 @@ int main(void) {
     br_hmac_key_init(&kc, digest_class, key, 32);
     br_hamc_init(&ctx, &kc, 0);
     br_hmac_update(&ctx, data, data.length());
-    uint64_t test_hmac = br_hmac_out(&ctx, tmp);
+    uint32_t test_hmac = br_hmac_out(&ctx, tmp);
     
     // test the hmac to make sure the data was not altered (Integrity/Authenticity)
     if (hmac == test_hmac) {
