@@ -10,6 +10,7 @@ Primitives to use?
 - AES 
     - CBC: XOR with IV first, and then 
 - one-time pad
+- GCM ???
 
 
 There is no security measures on:

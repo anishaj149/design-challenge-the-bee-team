@@ -212,6 +212,16 @@ void load_firmware(void)
   } // while(1)
 }
 
+int verify_hmac(uint32_t metadata, char data[]) {
+    
+    return 0;  
+}
+
+char decrypt_firmware(char data[]) {
+    
+    return data;
+}
+
 
 /*
  * Program a stream of bytes to the flash.
