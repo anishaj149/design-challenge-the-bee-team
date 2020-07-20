@@ -8,9 +8,15 @@ Primitives to use?
 - Asymmetric Keys
 - RSA (video)
 - AES 
+<<<<<<< HEAD
     - CBC (a block cipher): XOR with IV first, and then encrypt
     
 Must add security measures to:
+=======
+    - CBC: XOR with IV first, and then 
+- one-time pad
+- GCM ???
+>>>>>>> 5230fb710ad94e83f3d4fdbb1c95e4aa230531f7
 
 - fw_update 
 - fw_protect
