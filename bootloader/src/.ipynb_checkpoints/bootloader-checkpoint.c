@@ -212,7 +212,24 @@ void load_firmware(void)
   } // while(1)
 }
 
-int verify_hmac(uint32_t metadata, char data[]) {
+// verify if the data was modified by calculating a new hmac and comparing it to the given hmac
+int verify_hmac(unsigned char *hmac, unsigned char *data, unsigned int data_len) {
+    
+    // given code to set up a new hmac using the key, algorithm, and data
+    unsigned char tmp[32];
+    const br_hash_class *digest_class = &br_sha256_vtable;
+    br_hmac_key_context kc;
+    br_hmac_context ctx;
+    
+    br_hmac_key_init(&kc, digest_class, KEY, KEY_LEN);
+    br_hamc_init(&ctx, &kc, 0);
+    br_hmac_update(&ctx, data, data_len);
+    uint64_t test_hmac = br_hmac_out(&ctx, tmp);
+    
+    // test the hmac to make sure the data was not altered (Integrity/Authenticity)
+    if (hmac == test_hmac) {
+        return 1;
+    }
     
     return 0;  
 }
