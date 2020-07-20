@@ -4,6 +4,7 @@ Firmware Bundle-and-Protect Tool
 """
 import argparse
 import struct
+from Crypto.Cipher import AES
 
 
 def protect_firmware(infile, outfile, version, message):
@@ -34,8 +35,12 @@ def protect_firmware(infile, outfile, version, message):
     with open(outfile, 'wb+') as outfile:
         outfile.write(firmware_blob)
 
-def cbc_encryption():
-    pass
+def cbc_encryption(firmware):
+    #Firmware format is just the firmware. The size and release message are to be added later. 
+    cipher = AES.new(key, AES.MODE_CBC)
+    
+    
+    
 def hmac_generation():
     pass
 
