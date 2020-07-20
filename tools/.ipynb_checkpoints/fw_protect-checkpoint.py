@@ -11,11 +11,21 @@ def protect_firmware(infile, outfile, version, message):
     with open(infile, 'rb') as fp:
         firmware = fp.read()
 
-    # Append null-terminated message to end of firmware
-    firmware_and_message = firmware + message.encode() + b'\00'
-
+    #encrypts the firmware w cbc mode aes-128
+    encrypted_firmware = cbc_encryption(firmware)
+    
     # Pack version and size into two little-endian shorts
     metadata = struct.pack('<HH', version, len(firmware))
+    
+    
+    #generates an hmac from the unencrypted metadata and the encrypted firmware
+    hmac = hmac_generation(metadata, encrypted_firmware)
+    
+    
+    # Append null-terminated message to end of firmware
+    firmware_and_message = encrypted_firmware + message.encode() + b'\00'
+
+   
 
     # Append firmware and message to metadata
     firmware_blob = metadata + firmware_and_message
@@ -24,6 +34,10 @@ def protect_firmware(infile, outfile, version, message):
     with open(outfile, 'wb+') as outfile:
         outfile.write(firmware_blob)
 
+def cbc_encryption():
+    pass
+def hmac_generation():
+    pass
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Firmware Update Tool')
