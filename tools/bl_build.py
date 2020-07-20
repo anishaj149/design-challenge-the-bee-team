@@ -10,6 +10,7 @@ import os
 import pathlib
 import shutil
 import subprocess
+import secrets
 
 FILE_DIR = pathlib.Path(__file__).parent.absolute()
 
@@ -43,6 +44,16 @@ def make_bootloader():
     # Return True if make returned 0, otherwise return False.
     return (status == 0)
 
+def gen_keys():  #Have to generate one CBC key and one HMAC key
+    cbc_key = secrets.token_bytes(16)  #generates a key of 16 bytes for CBC
+    hmac_key = secrets.token_bytes(64) #Generates a key of 64 bytes for HMAC
+    with open('secret_build_output.txt','wb') as fp:  #Opens the file which stores keys
+        fp.write(cbc_key)  #Writes the cbc key
+        fp.write(b'\n')    #Writes a newline to separate the keys
+        fp.write(hmac_key) #Writes the hmac key
+        fp.write(b'\n')  #writes a newline to separate from the next cbc key
+        
+        #Is there a need to return anything??
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Bootloader Build Tool')
@@ -60,3 +71,4 @@ if __name__ == '__main__':
 
     copy_initial_firmware(binary_path)
     make_bootloader()
+    gen_keys()
