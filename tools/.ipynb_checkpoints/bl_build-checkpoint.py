@@ -53,7 +53,6 @@ def gen_keys():  #Have to generate one CBC key and one HMAC key
         fp.write(hmac_key) #Writes the hmac key
         fp.write(b'\n')  #writes a newline to separate from the next cbc key
         
-        #Is there a need to return anything??
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Bootloader Build Tool')
