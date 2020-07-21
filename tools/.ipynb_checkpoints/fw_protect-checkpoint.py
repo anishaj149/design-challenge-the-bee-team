@@ -43,7 +43,9 @@ def cbc_encryption(firmware):
     #128 bit IV
     with open('secret_build_output.txt','rb') as fp:
         key = fp.readlines()  #Returns a list. Each line is an index in the list.
-        key = key[0]  #key should be 16 bytes long
+        key = key[-2]  #key should be 16 bytes long. 
+        #The keys are generated with one line being CBC and the next line being HMAC
+        #The CBC key will be the second to last item in the list.
         key = key.rstrip()  #removes any possible newlines 
         
     cipher = AES.new(key, AES.MODE_CBC)  #makes a cipher object with a random IV
