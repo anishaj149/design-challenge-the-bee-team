@@ -41,7 +41,7 @@ def cbc_encryption():
 def hmac_generation(metadata, ciphertext):
 #     with open("secret_build_output.txt", "rb") as f:
 #         key_list = f.readlines()
-#     key = key_list[1]
+#     key = key_list[1].rstrip()
 
     
     key = b'0123456789012345678901234567890123456789012345678901234567890123'
