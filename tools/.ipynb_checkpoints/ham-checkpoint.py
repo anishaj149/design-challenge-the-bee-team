@@ -19,6 +19,6 @@ def hmac_generation(metadata, ciphertext):
     #returns that hmac
     return h.hexdigest()
 
-metadata = b'\x01\x11\x12\x03'
-print(hmac_generation(metadata, ciphertext = b'thebeeteam'))
-print(len('2ee889c96ecfceb65d4e5e4e487d76bf2efd372f77b8f5017e5b675be71b5262'))
+meta = b'\x01\x02\x03\x04'
+data = b'uhhhhhhh'
+print(hmac_generation(meta, data))
