@@ -13,14 +13,14 @@
 #include "uart.h"
 
 // HMAC Imports
-#include "inc/bearssl_hmac.h"
+#include "bearssl_hmac.h"
 
 // Forward Declarations
 void load_initial_firmware(void);
 void load_firmware(void);
 void boot_firmware(void);
 long program_flash(uint32_t, unsigned char*, unsigned int);
-
+int verify_hmac(uint32_t version, uint32_t size, unsigned char *hmac, unsigned char *data, unsigned int data_len);
 
 // Firmware Constants
 #define METADATA_BASE 0xFC00  // base address of version and firmware size in Flash
@@ -38,6 +38,12 @@ long program_flash(uint32_t, unsigned char*, unsigned int);
 #define UPDATE ((unsigned char)'U')
 #define BOOT ((unsigned char)'B')
 
+// define HMAC Constants
+#define HMAC_SIZE 64
+
+// define IV Constants
+#define IV_SIZE 16
+
 
 // Firmware v2 is embedded in bootloader
 extern int _binary_firmware_bin_start;
@@ -51,6 +57,12 @@ uint8_t *fw_release_message_address;
 
 // Firmware Buffer
 unsigned char data[FLASH_PAGESIZE];
+
+// HMAC Buffer?
+unsigned char hmac[HMAC_SIZE];
+
+// IV Buffer?
+unsigned char iv [IV_SIZE];
 
 
 int main(void) {
@@ -72,6 +84,8 @@ int main(void) {
   uart_write_str(UART2, "Welcome to the BWSI Vehicle Update Service!\n");
   uart_write_str(UART2, "Send \"U\" to update, and \"B\" to run the firmware.\n");
   uart_write_str(UART2, "Writing 0x20 to UART0 will reset the device.\n");
+    
+    verify_hmac(NULL, NULL, NULL, NULL, NULL);
 
   int resp;
   while (1){
@@ -181,6 +195,18 @@ void load_firmware(void)
         data[data_index] = uart_read(UART1, BLOCKING, &read);
         data_index += 1;
     } //for
+      
+    // get iv bytes
+    for (int i = 0; i < IV_SIZE; i++) {
+        iv[i] = uart_read(UART1, BLOCKING, &read);
+    }
+    
+    // get HMAC bytes
+    for (int i = 0; i < HMAC_SIZE; i++) {
+        hmac[i] = uart_read(UART1, BLOCKING, &read);
+    }
+      
+    verify_hmac(version, size, hmac, data, frame_length);
 
     // If we filed our page buffer, program it
     if (data_index == FLASH_PAGESIZE || frame_length == 0) {
@@ -216,7 +242,7 @@ void load_firmware(void)
 
 // verify if the data was modified by calculating a new hmac and comparing it to the given hmac
 // hmac parameter is currently hard-coded
-int verify_hmac(unsigned char *hmac, unsigned char *data, unsigned int data_len) {
+int verify_hmac(uint32_t version, uint32_t size, unsigned char *hmac, unsigned char *data, unsigned int data_len) {
     
     // given code to set up a new hmac using the key, algorithm, and data
     unsigned char tmp[64];
@@ -228,19 +254,49 @@ int verify_hmac(unsigned char *hmac, unsigned char *data, unsigned int data_len)
     // br_hmac_key_init(&kc, digest_class, KEY, KEY_LEN); // non-hard-coded code
     char* key = "0123456789012345678901234567890123456789012345678901234567890123";
     br_hmac_key_init(&kc, digest_class, key, 64);
-    br_hamc_init(&ctx, &kc, 0);
-    br_hmac_update(&ctx, data, data_len);
-    uint64_t test_hmac = br_hmac_out(&ctx, tmp);
+    br_hmac_init(&ctx, &kc, 0);
+    //br_hmac_update(&ctx, version|size|data, 4 + 4 + data_len); // correct line of code
+    br_hmac_update(&ctx, strcat((char *)"\x01\x02\x03\x04",(char *)"thebeeteam"), 10); // hardcoded data
+    br_hmac_out(&ctx, tmp);
     
     // test the hmac to make sure the data was not altered (Integrity/Authenticity)
-    if (hmac == test_hmac) {
-        return 1;
+    
+    hmac = tmp;
+    // loop through if each element of hmac and tmp is the same (security)
+    if (is_same(hmac, tmp)) {
+        uart_write_str(UART2, "HMAC is Valid");
+        //return 1;
     }
     
+    //uart_write_str(UART2, hmac);
+    uart_write_str(UART2, (uint32_t *)tmp);
     return 0;  
 }
 
-char decrypt_firmware(char data[]) {
+int is_same(char* hmac, char* tmp) {
+    int size = 0;
+    if (sizeof(hmac) < sizeof(tmp)) {
+        size = sizeof(hmac);
+        size /= sizeof(hmac[0]);
+    } else {
+        size = sizeof(tmp);
+        size /= sizeof(tmp[0]);
+    }
+    
+    int equal = 1; // equals 0 when hmac and tmp are equal
+    for (int i = 0; i < size; i++) {
+        if (*(hmac + i) == *(tmp + i)) {
+            equal = 1;
+        } else {
+            equal = 0;
+        }
+    }
+    
+    return equal;
+}
+
+// If this messes everything up I will cry
+char* decrypt_firmware(char data[]) {
     
     return data;
 }
