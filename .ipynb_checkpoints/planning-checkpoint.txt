@@ -21,15 +21,12 @@ There is no security measures on:
 Our plan:
 
 Encryption:
-plaintext
 encrypt CBC (ciphertext)
 generate HMAC
 append to encryption
 encrypt CTR (ciphertext + HMAC)
-Caesar Cipher 26
 
 Decryption:
-Caesar Cipher 26
 decrypt CTR (ciphertext + HMAC)
 check HMAC
 decrypt CBC (ciphertext)
