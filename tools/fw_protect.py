@@ -7,6 +7,8 @@ import struct
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad
 
+from Crypto.Hash import HMAC, SHA256
+
 def protect_firmware(infile, outfile, version, message):
     # Load firmware binary from infile
     with open(infile, 'rb') as fp:
@@ -29,7 +31,7 @@ def protect_firmware(infile, outfile, version, message):
    
 
     # Append firmware and message to metadata
-    firmware_blob = metadata + firmware_and_message
+    firmware_blob = metadata + firmware_and_message + hmac
 
     # Write firmware blob to outfile
     with open(outfile, 'wb+') as outfile:
@@ -63,8 +65,25 @@ def cbc_encryption(firmware):
     
     return final_encrypt  #returns CBC encryption
     
-def hmac_generation():
-    pass
+def hmac_generation(metadata, ciphertext):
+#     with open("secret_build_output.txt", "rb") as f:
+#         key_list = f.readlines()
+#     key = key_list[1].rstrip()
+
+    
+    key = b'0123456789012345678901234567890123456789012345678901234567890123'
+    
+    #generates a new hmac object
+    h = HMAC.new(key, digestmod=SHA256)
+    
+    #makes an hmac for the unencrypted metadata and the encrypted firmware
+    h.update(metadata)
+    h.update(ciphertext)
+    
+    
+    #returns that hmac
+    return h.digest()
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Firmware Update Tool')
