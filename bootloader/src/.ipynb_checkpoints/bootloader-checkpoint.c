@@ -11,6 +11,10 @@
 
 // Application Imports
 #include "uart.h"
+// For CBC decryption
+#include "bearssl.h" 
+#include <stdlib.h>
+#include <string.h>
 
 
 // Forward Declarations
@@ -18,6 +22,7 @@ void load_initial_firmware(void);
 void load_firmware(void);
 void boot_firmware(void);
 long program_flash(uint32_t, unsigned char*, unsigned int);
+int decrypt_firmware();
 
 
 // Firmware Constants
@@ -64,13 +69,15 @@ int main(void) {
   // Enable UART0 interrupt
   IntEnable(INT_UART0);
   IntMasterEnable();
-
+  
   load_initial_firmware();
 
   uart_write_str(UART2, "Welcome to the BWSI Vehicle Update Service!\n");
   uart_write_str(UART2, "Send \"U\" to update, and \"B\" to run the firmware.\n");
   uart_write_str(UART2, "Writing 0x20 to UART0 will reset the device.\n");
 
+  decrypt_firmware();
+    
   int resp;
   while (1){
     uint32_t instruction = uart_read(UART1, BLOCKING, &resp);
@@ -212,19 +219,40 @@ void load_firmware(void)
   } // while(1)
 }
 
-<<<<<<< HEAD
-=======
 int verify_hmac(uint32_t metadata, char data[]) {
     
     return 0;  
 }
 
-char decrypt_firmware(char data[]) {
+
+int decrypt_firmware(){ //(char* iv, char* key, unsigned short KEY_LEN, char* data, unsigned short DATA_LEN) {
+    char* iv = "\xa8\xe8\x8c\xfd~\x97w\xca\xd0\xc5\x7f\x89]u`\xd6";
+    unsigned short KEY_LEN =  0x10;
+    char* key = "AAAAAAAAAAAAAAAA";
+    char* data = "`MU*\x00#o\x1e\xbe\xcb\xb7W\x1a\xbeU\xcf\x1ce\xe3b\xc0e\x9e]\xd6\xe6R\xf1\xc6m\xd2\xc8s?\x99\xad\xfff\xbejL\xf0(2e\x88d";
+    unsigned short DATA_LEN = 0x30;
+
     
-    return data;
+    //all the AES CBC stuff
+    const br_block_cbcdec_class * vd = &br_aes_big_cbcdec_vtable;
+    br_aes_gen_cbcdec_keys v_dc;
+    const br_block_cbcdec_class **dc;
+    dc = &v_dc.vtable;
+    
+    //decoding the stuff in place ???
+    vd->init(dc, key, KEY_LEN);
+    vd->run(dc, iv, data, DATA_LEN);
+    
+    //transmitting all the decoded data on UART2 for debugging purpuses
+    int i = 0;
+    while(data[i] != '\0') {
+        uart_write_str(UART2, data[i]);
+        i += 1;
+    }
+    //Success!
+    return 1;
 }
 
->>>>>>> 4a293a210e6cfb7db6f1e6e5d61815b70e96e69a
 
 /*
  * Program a stream of bytes to the flash.
