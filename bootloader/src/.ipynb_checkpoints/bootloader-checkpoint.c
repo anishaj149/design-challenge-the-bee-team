@@ -240,9 +240,14 @@ void load_firmware(void)
   } // while(1)
 }
 
-// verify if the data was modified by calculating a new hmac and comparing it to the given hmac
-// hmac parameter is currently hard-coded
+// verify if the data was modified by calculating a new hmac and comparing it to the given hmac (Integrity/Authenticity)
+// everything is currently hard-coded
 int verify_hmac(uint32_t version, uint32_t size, unsigned char *hmac, unsigned char *data, unsigned int data_len) {
+    
+    char *str = strcat((char *)"\x01\x02\x03\x04",(char *)"thebeeteam");
+    char* key = "0123456789012345678901234567890123456789012345678901234567890123";
+
+    // KEY is currently hard-coded into br_hmac_key_init
     
     // given code to set up a new hmac using the key, algorithm, and data
     unsigned char tmp[64];
@@ -250,29 +255,33 @@ int verify_hmac(uint32_t version, uint32_t size, unsigned char *hmac, unsigned c
     br_hmac_key_context kc;
     br_hmac_context ctx;
     
-    // KEY is currently hard-coded into br_hmac_key_init
     // br_hmac_key_init(&kc, digest_class, KEY, KEY_LEN); // non-hard-coded code
-    char* key = "0123456789012345678901234567890123456789012345678901234567890123";
-    br_hmac_key_init(&kc, digest_class, key, 64);
-    br_hmac_init(&ctx, &kc, 0);
+    br_hmac_key_init(&kc, digest_class, key, 64); // hard-coded data
+    br_hmac_init(&ctx, &kc, 0); // I set the 0 to 64 and nothing changed? idk
     //br_hmac_update(&ctx, version|size|data, 4 + 4 + data_len); // correct line of code
-    br_hmac_update(&ctx, strcat((char *)"\x01\x02\x03\x04",(char *)"thebeeteam"), 10); // hardcoded data
+    br_hmac_update(&ctx, str, sizeof(str)); // hard-coded data
     br_hmac_out(&ctx, tmp);
-    
-    // test the hmac to make sure the data was not altered (Integrity/Authenticity)
-    
-    hmac = tmp;
+        
+    //hmac = tmp;
     // loop through if each element of hmac and tmp is the same (security)
     if (is_same(hmac, tmp)) {
         uart_write_str(UART2, "HMAC is Valid");
         //return 1;
+    } else {
+        uart_write_str(UART2, "HMAC is Invalid");
     }
-    
-    //uart_write_str(UART2, hmac);
+    uart_write_str(UART2, "\n");
+    uart_write_str(UART2, hmac);
+    uart_write_str(UART2, "\n");
+    uart_write_hex(UART2, *hmac >> 32);
+    uart_write_str(UART2, "\n");
+    uart_write_hex(UART2, (uint32_t *)hmac);
+    uart_write_str(UART2, "\ntmp : \n");
     uart_write_str(UART2, (uint32_t *)tmp);
     return 0;  
 }
 
+// method checks if the given and calculated HMACs are the same
 int is_same(char* hmac, char* tmp) {
     int size = 0;
     if (sizeof(hmac) < sizeof(tmp)) {
@@ -286,7 +295,7 @@ int is_same(char* hmac, char* tmp) {
     int equal = 1; // equals 0 when hmac and tmp are equal
     for (int i = 0; i < size; i++) {
         if (*(hmac + i) == *(tmp + i)) {
-            equal = 1;
+            equal = 1; // set to a number for security --> time/power?
         } else {
             equal = 0;
         }
