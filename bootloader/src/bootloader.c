@@ -262,14 +262,16 @@ int verify_hmac(uint32_t version, uint32_t size, unsigned char *hmac, unsigned c
     
     // br_hmac_key_init(&kc, digest_class, KEY, KEY_LEN); // non-hard-coded code
     br_hmac_key_init(&kc, digest_class, key, 64); // hard-coded data
-    br_hmac_init(&ctx, &kc, 32);
-    //br_hmac_update(&ctx, version|size|data, 4 + 4 + data_len); // correct line of code
-    br_hmac_update(&ctx, str, 14); // hard-coded data
+    br_hmac_init(&ctx, &kc, 0);
+    //br_hmac_update(&ctx, version, 4); // correct line of code to add version, size, and data to HMAC
+    //br_hmac_update(&ctx, size, 4);
+    //br_hmac_update(&ctx, data, data_len); 
+    br_hmac_update(&ctx, str, 14); // hard-coded data data
     br_hmac_out(&ctx, tmp);
         
     //hmac = tmp;
 
-    // loop through if each element of hmac and tmp is the same (security)
+    // loop through if each element of hmac and tmp is the same (remember security)
     if (is_same(hmac, tmp)) {
         uart_write_str(UART2, "HMAC is Valid");
         //return 1;
@@ -280,6 +282,7 @@ int verify_hmac(uint32_t version, uint32_t size, unsigned char *hmac, unsigned c
     for (int i = 0; i < sizeof(tmp); i+=4) {
         uart_write_hex(UART2, *((uint32_t*)(tmp + i)));
     }
+    uart_write_str(UART2, "\nEnd tmp");
     // ignore this code for now but it probably means there is a problem :(
 //     uart_write_str(UART2, "\nHMAC : \n");
 //     for (int i = 0; i < sizeof(hmac); i+=4) {
