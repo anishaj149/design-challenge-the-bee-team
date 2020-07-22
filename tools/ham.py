@@ -17,8 +17,17 @@ def hmac_generation(metadata, ciphertext):
     
     
     #returns that hmac
-    return h.hexdigest()
+    ham = h.digest()
+    
+   
 
-meta = b'\x01\x02\x03\x04'
+    return "{" + ",".join([hex(c) for c in ham]) + "}"
+
+meta = b'howd'
+meta1 = bytearray([1,2,3,4])
 data = b'thebeeteam'
 print(hmac_generation(meta, data))
+
+c_meta = "{" + ",".join([hex(c) for c in meta]) + "}"
+print(c_meta)
+
