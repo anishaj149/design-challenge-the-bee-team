@@ -21,6 +21,7 @@ void load_firmware(void);
 void boot_firmware(void);
 long program_flash(uint32_t, unsigned char*, unsigned int);
 int verify_hmac(uint32_t version, uint32_t size, unsigned char *hmac, unsigned char *data, unsigned int data_len);
+int is_same(char* hmac, char* tmp);
 
 // Firmware Constants
 #define METADATA_BASE 0xFC00  // base address of version and firmware size in Flash
@@ -244,25 +245,30 @@ void load_firmware(void)
 // everything is currently hard-coded
 int verify_hmac(uint32_t version, uint32_t size, unsigned char *hmac, unsigned char *data, unsigned int data_len) {
     
-    char *str = strcat((char *)"\x01\x02\x03\x04",(char *)"thebeeteam");
+    // hardcoded stuff vvv
+    size = 10;
+    char str[size + 4];
+    strcpy(str, "howd");
+    strcat(str, "thebeeteam");
     char* key = "0123456789012345678901234567890123456789012345678901234567890123";
 
     // KEY is currently hard-coded into br_hmac_key_init
     
     // given code to set up a new hmac using the key, algorithm, and data
-    unsigned char tmp[64];
+    unsigned char tmp[32];
     const br_hash_class *digest_class = &br_sha256_vtable;
     br_hmac_key_context kc;
     br_hmac_context ctx;
     
     // br_hmac_key_init(&kc, digest_class, KEY, KEY_LEN); // non-hard-coded code
     br_hmac_key_init(&kc, digest_class, key, 64); // hard-coded data
-    br_hmac_init(&ctx, &kc, 0); // I set the 0 to 64 and nothing changed? idk
+    br_hmac_init(&ctx, &kc, 32);
     //br_hmac_update(&ctx, version|size|data, 4 + 4 + data_len); // correct line of code
-    br_hmac_update(&ctx, str, sizeof(str)); // hard-coded data
+    br_hmac_update(&ctx, str, 14); // hard-coded data
     br_hmac_out(&ctx, tmp);
         
     //hmac = tmp;
+
     // loop through if each element of hmac and tmp is the same (security)
     if (is_same(hmac, tmp)) {
         uart_write_str(UART2, "HMAC is Valid");
@@ -270,14 +276,15 @@ int verify_hmac(uint32_t version, uint32_t size, unsigned char *hmac, unsigned c
     } else {
         uart_write_str(UART2, "HMAC is Invalid");
     }
-    uart_write_str(UART2, "\n");
-    uart_write_str(UART2, hmac);
-    uart_write_str(UART2, "\n");
-    uart_write_hex(UART2, *hmac >> 32);
-    uart_write_str(UART2, "\n");
-    uart_write_hex(UART2, (uint32_t *)hmac);
     uart_write_str(UART2, "\ntmp : \n");
-    uart_write_str(UART2, (uint32_t *)tmp);
+    for (int i = 0; i < sizeof(tmp); i+=4) {
+        uart_write_hex(UART2, *((uint32_t*)(tmp + i)));
+    }
+    // ignore this code for now but it probably means there is a problem :(
+//     uart_write_str(UART2, "\nHMAC : \n");
+//     for (int i = 0; i < sizeof(hmac); i+=4) {
+//         uart_write_hex(UART2, *((uint32_t*)(hmac + i)));
+//     }
     return 0;  
 }
 
