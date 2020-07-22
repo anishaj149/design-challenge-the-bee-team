@@ -40,8 +40,9 @@ def make_bootloader():
     os.chdir(bootloader)
 
     subprocess.call('make clean', shell=True)
-    status = subprocess.call('make')
-
+   # status = subprocess.call('make',shell=True)  #Makes us able to pass in commands
+    status = subprocess.call(f'make KEY={to_c_array(key)}', shell=True) #Makes us able to pass in commands
+    
     # Return True if make returned 0, otherwise return False.
     return (status == 0)
 
@@ -54,6 +55,9 @@ def gen_keys():  #Have to generate one CBC key and one HMAC key
         fp.write(hmac_key) #Writes the hmac key
         fp.write(b'\n')  #writes a newline to separate from the next cbc key
         
+        
+def to_c_array(binary_string):
+    return "{" + ",".join([hex(c) for c in binary_string]) + "}"
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Bootloader Build Tool')
