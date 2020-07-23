@@ -74,8 +74,9 @@ def main(ser, infile, debug):
         firmware_blob = fp.read()
 
     metadata = firmware_blob[:4]
-    firmware = firmware_blob[4:]
-
+    firmware = firmware_blob[4:-32]
+    hmac = firmware_blob[-32:]
+    
     send_metadata(ser, metadata, debug=debug)
 
     for idx, frame_start in enumerate(range(0, len(firmware), FRAME_SIZE)):
@@ -98,6 +99,15 @@ def main(ser, infile, debug):
     # Send a zero length payload to tell the bootlader to finish writing it's page.
     ser.write(struct.pack('>H', 0x0000))
 
+    length = len(hmac)
+    frame_fmt = '>H{}s'.format(length)
+    frame = struct.pack(frame_fmt, length, hmac)
+    
+    if debug:
+            print("Writing frame {} ({} bytes)...".format(idx, len(frame)))
+    
+    send_frame(ser, frame, debug=debug)
+    
     return ser
 
 
