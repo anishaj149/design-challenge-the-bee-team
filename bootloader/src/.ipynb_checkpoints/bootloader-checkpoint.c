@@ -11,6 +11,10 @@
 
 // Application Imports
 #include "uart.h"
+// For CBC decryption
+#include "bearssl.h" 
+#include <stdlib.h>
+#include <string.h>
 
 // HMAC Imports
 #include "bearssl_hmac.h"
@@ -22,6 +26,13 @@ void boot_firmware(void);
 long program_flash(uint32_t, unsigned char*, unsigned int);
 int verify_hmac(unsigned char *hmac, unsigned char *data);
 int is_same(char* hmac, char* tmp);
+
+int decrypt_firmware();
+
+
+int verify_hmac(uint32_t version, uint32_t size, unsigned char *hmac, unsigned char *data, unsigned int data_len);
+>>>>>>> origin/first_merge
+
 
 // Firmware Constants
 #define METADATA_BASE 0xFC00  // base address of version and firmware size in Flash
@@ -65,6 +76,10 @@ unsigned char hmac[HMAC_SIZE];
 // IV Buffer?
 unsigned char iv [IV_SIZE];
 
+//Define keys
+char cbc_key[16] = CBC;
+char hmac_key[16] = HMAC;
+
 int main(void) {
 
   // Initialize UART channels
@@ -78,7 +93,7 @@ int main(void) {
   // Enable UART0 interrupt
   IntEnable(INT_UART0);
   IntMasterEnable();
-
+  
   load_initial_firmware();
 
   uart_write_str(UART2, "Welcome to the BWSI Vehicle Update Service!\n");
@@ -87,6 +102,8 @@ int main(void) {
     
     verify_hmac(NULL, NULL);
 
+  decrypt_firmware();
+    
   int resp;
   while (1){
     uint32_t instruction = uart_read(UART1, BLOCKING, &resp);
@@ -269,6 +286,41 @@ int verify_hmac(unsigned char *hmac, unsigned char *data) {
     return 0;  
 }
 
+
+
+int decrypt_firmware(){ //(char* iv, char* key, unsigned short KEY_LEN, char* data, unsigned short DATA_LEN) {
+    char* iv = "\xa8\xe8\x8c\xfd~\x97w\xca\xd0\xc5\x7f\x89]u`\xd6";
+    unsigned short KEY_LEN =  0x10;
+    char* key = "AAAAAAAAAAAAAAAA";
+    char* data = "`MU*\x00#o\x1e\xbe\xcb\xb7W\x1a\xbeU\xcf\x1ce\xe3b\xc0e\x9e]\xd6\xe6R\xf1\xc6m\xd2\xc8s?\x99\xad\xfff\xbejL\xf0(2e\x88d";
+    unsigned short DATA_LEN = 0x30;
+
+    
+    //all the AES CBC stuff
+    const br_block_cbcdec_class * vd = &br_aes_big_cbcdec_vtable;
+    br_aes_gen_cbcdec_keys v_dc;
+    const br_block_cbcdec_class **dc;
+    dc = &v_dc.vtable;
+
+
+
+
+
+    
+    //decoding the stuff in place ???
+    vd->init(dc, key, KEY_LEN);
+    vd->run(dc, iv, data, DATA_LEN);
+    
+    //transmitting all the decoded data on UART2 for debugging purpuses
+    int i = 0;
+    while(data[i] != '\0') {
+        uart_write_str(UART2, data[i]);
+        i += 1;
+    }
+    //Success!
+    return 1;
+}
+
 // method checks if the given and calculated HMACs are the same
 int is_same(char* hmac, char* tmp) {
     int size = 0;
@@ -292,13 +344,6 @@ int is_same(char* hmac, char* tmp) {
     
     return equal;
 }
-
-// If this messes everything up I will cry
-char* decrypt_firmware(char data[]) {
-    
-    return data;
-}
-
 
 /*
  * Program a stream of bytes to the flash.
