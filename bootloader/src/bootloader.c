@@ -20,7 +20,7 @@ void load_initial_firmware(void);
 void load_firmware(void);
 void boot_firmware(void);
 long program_flash(uint32_t, unsigned char*, unsigned int);
-int verify_hmac(uint32_t version, uint32_t size, unsigned char *hmac, unsigned char *data, unsigned int data_len);
+int verify_hmac(unsigned char *hmac, unsigned char *data);
 int is_same(char* hmac, char* tmp);
 
 // Firmware Constants
@@ -40,7 +40,7 @@ int is_same(char* hmac, char* tmp);
 #define BOOT ((unsigned char)'B')
 
 // define HMAC Constants
-#define HMAC_SIZE 64
+#define HMAC_SIZE 32
 
 // define IV Constants
 #define IV_SIZE 16
@@ -66,8 +66,8 @@ unsigned char hmac[HMAC_SIZE];
 unsigned char iv [IV_SIZE];
 
 // Key Declarations
-char CBC_key[16] = CBC;
-char hmac_key[16] = HMAC;
+char CBC_key[16];// = CBC;
+char hmac_key[16];// = HMAC;
 
 int main(void) {
 
@@ -89,7 +89,7 @@ int main(void) {
   uart_write_str(UART2, "Send \"U\" to update, and \"B\" to run the firmware.\n");
   uart_write_str(UART2, "Writing 0x20 to UART0 will reset the device.\n");
     
-    verify_hmac(NULL, NULL, NULL, NULL, NULL);
+    verify_hmac(NULL, NULL);
 
   int resp;
   while (1){
@@ -203,14 +203,14 @@ void load_firmware(void)
     // get iv bytes
     for (int i = 0; i < IV_SIZE; i++) {
         iv[i] = uart_read(UART1, BLOCKING, &read);
-    }
+    } // for
     
     // get HMAC bytes
     for (int i = 0; i < HMAC_SIZE; i++) {
         hmac[i] = uart_read(UART1, BLOCKING, &read);
-    }
+    } // for
       
-    verify_hmac(version, size, hmac, data, frame_length);
+    verify_hmac(hmac, data);
 
     // If we filed our page buffer, program it
     if (data_index == FLASH_PAGESIZE || frame_length == 0) {
@@ -246,58 +246,37 @@ void load_firmware(void)
 
 // verify if the data was modified by calculating a new hmac and comparing it to the given hmac (Integrity/Authenticity)
 // everything is currently hard-coded
-int verify_hmac(uint32_t version, uint32_t size, unsigned char *hmac, unsigned char *data, unsigned int data_len) {
-    
-    // hardcoded stuff vvv
-    size = 10;
-    char str[14];
-    strcpy(str, "howd");
-    strcat(str, "thebeeteam");
-    char* key = "0123456789012345678901234567890123456789012345678901234567890123";
-
-    // KEY is currently hard-coded into br_hmac_key_init
-    
-    // given code to set up a new hmac using the key, algorithm, and data
+int verify_hmac(unsigned char *hmac, unsigned char *data) {    
+    // declare variables used to create HMAC
     unsigned char tmp[32];
     const br_hash_class *digest_class = &br_sha256_vtable;
     br_hmac_key_context kc;
     br_hmac_context ctx;
     
-    // br_hmac_key_init(&kc, digest_class, hmac_key, KEY_LEN); // non-hard-coded code
-    br_hmac_key_init(&kc, digest_class, key, 64); // hard-coded data
+    // Initialize the HMAC key and HMAC
+    br_hmac_key_init(&kc, digest_class, hmac_key, HMAC_SIZE);
     br_hmac_init(&ctx, &kc, 0);
-    //br_hmac_update(&ctx, version, 4); // correct line of code to add version, size, and data to HMAC
-    //br_hmac_update(&ctx, size, 4);
-    //br_hmac_update(&ctx, data, data_len); 
-    br_hmac_update(&ctx, str, 4); // hard-coded data data
-    br_hmac_update(&ctx, str, 10); // hard-coded data data
+    
+    // add data to be inside the HMAC
+    br_hmac_update(&ctx, data, sizeof(data));
+    
+    // write the calculated HMAC into tmp
     br_hmac_out(&ctx, tmp);
-        
-    //hmac = tmp;
 
-    // loop through if each element of hmac and tmp is the same (remember security)
+    // loop through each element of hmac and tmp and test if they are the same
     if (is_same(hmac, tmp)) {
         uart_write_str(UART2, "HMAC is Valid");
-        //return 1;
+        return 1;
     } else {
         uart_write_str(UART2, "HMAC is Invalid");
     }
-    uart_write_str(UART2, "\ntmp : \n");
-    for (int i = 0; i < sizeof(tmp); i+=4) {
-        uart_write_hex(UART2, *((uint32_t*)(tmp + i)));
-    }
-    uart_write_str(UART2, "\nEnd tmp");
-    // ignore this code for now but it probably means there is a problem :(
-//     uart_write_str(UART2, "\nHMAC : \n");
-//     for (int i = 0; i < sizeof(hmac); i+=4) {
-//         uart_write_hex(UART2, *((uint32_t*)(hmac + i)));
-//     }
-    return 1;  
+    return 0;  
 }
 
 // method checks if the given and calculated HMACs are the same
 int is_same(char* hmac, char* tmp) {
     int size = 0;
+    // get the HMAC with the greater size (tho they should be the same length ya never know)
     if (sizeof(hmac) < sizeof(tmp)) {
         size = sizeof(hmac);
         size /= sizeof(hmac[0]);
