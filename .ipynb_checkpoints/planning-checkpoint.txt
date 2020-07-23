@@ -6,18 +6,24 @@ Primitives to use?
 - Hashing 
 - Symmetric keys
 - Asymmetric Keys
-- RSA (we'll see ab this one later oml)
+- RSA (video)
 - AES 
+<<<<<<< HEAD
+    - CBC (a block cipher): XOR with IV first, and then encrypt
+    
+Must add security measures to:
+=======
     - CBC: XOR with IV first, and then 
 - one-time pad
 - GCM ???
+>>>>>>> 5230fb710ad94e83f3d4fdbb1c95e4aa230531f7
 
-
-There is no security measures on:
-
-- fw_update
+- fw_update 
 - fw_protect
 
+<<<<<<< HEAD
+    
+=======
 Our plan:
 
 Encryption:
@@ -32,3 +38,4 @@ check HMAC
 decrypt CBC (ciphertext)
 
 Check version # (can't be an older version excluding 0)
+>>>>>>> origin/first_merge
