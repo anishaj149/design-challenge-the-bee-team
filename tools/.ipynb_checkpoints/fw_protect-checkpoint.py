@@ -33,10 +33,14 @@ def protect_firmware(infile, outfile, version, message):
         firmware_blob += firmware_iv_message[i, i+32]
         firmware_blob += hmac_generation(firmware_iv_message[i, i+32])
     
+    #appends an hmac of all the *data* onto the very end of the entire firmware blob
+    firmware_blob += hmac_generation(firmware_iv_message)
     
     # Write firmware blob to outfile
     with open(outfile, 'wb+') as outfile:
         outfile.write(firmware_blob)
+    
+    
 
 def cbc_encryption():
     pass

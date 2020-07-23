@@ -95,7 +95,7 @@ def main(ser, infile, debug):
 
     print("Done writing firmware.")
 
-    # Send a zero length payload to tell the bootlader to finish writing it's page.
+    # Send a zero length payload to tell the bootlader to finish writing its page.
     ser.write(struct.pack('>H', 0x0000))
 
     return ser
