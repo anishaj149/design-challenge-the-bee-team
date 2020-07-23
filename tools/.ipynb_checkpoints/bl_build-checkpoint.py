@@ -41,7 +41,7 @@ def make_bootloader():
 
     subprocess.call('make clean', shell=True)
    # status = subprocess.call('make',shell=True)  #Makes us able to pass in commands
-    status = subprocess.call(f'make KEY={to_c_array(key)}', shell=True) #Makes us able to pass in commands
+    status = subprocess.call(f'make KEY={to_c_array(key)}', shell=True) #Makes us able to pass in commands make the key command anything you want. 
     
     # Return True if make returned 0, otherwise return False.
     return (status == 0)

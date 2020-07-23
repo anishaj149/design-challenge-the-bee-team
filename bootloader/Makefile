@@ -63,8 +63,8 @@ BEARSSL=${LIB}/BearSSL
 include ./makedefs
 
 CFLAGS+=-g  
-CFLAGS+=-D NAME=${KEY}  #Am I supposed to change NAME or KEY?? 
-CFLAGS+=-D NAME=${KEY}
+CFLAGS+=-D CBC=${KEY}  #Am I supposed to change NAME or KEY?? 
+CFLAGS+=-D HMAC=${KEY}
 
 #
 # Where to find header files that do not live in this directory.
