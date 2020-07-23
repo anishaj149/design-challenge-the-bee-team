@@ -73,6 +73,9 @@ unsigned char hmac[HMAC_SIZE];
 // IV Buffer?
 unsigned char iv [IV_SIZE];
 
+//Define keys
+char cbc_key[16] = CBC;
+char hmac_key[16] = HMAC;
 
 int main(void) {
 
