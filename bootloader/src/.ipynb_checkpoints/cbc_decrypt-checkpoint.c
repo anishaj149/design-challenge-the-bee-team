@@ -4,10 +4,10 @@
 #include <string.h>
 #define iv "Kl\x05\x11H\x85\xc8v\xd3\xcf\x87\xd4\x92\xde\x1f\xf4"
 #define IV_LEN 0x10
-#define KEY_LEN 0x100
+#define KEY_LEN 0x10
 #define KEY "AAAAAAAAAAAAAAAA"
 #define data "Not all those who wander are lost.""
-#define DATA_LEN
+#define DATA_LEN 0x22
 
 
 int main(); //(char * iv, unsigned short * IV_LEN, char *key, unsigned short KEY_LEN, char * data, unsigned short DATA_LEN) {

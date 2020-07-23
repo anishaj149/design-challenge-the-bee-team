@@ -56,7 +56,7 @@ def gen_keys():  #Have to generate one CBC key and one HMAC key
         fp.write(b'\n')  #writes a newline to separate from the next cbc key
         
         
-def to_c_array(binary_string):
+def to_c_array(binary_string): #Converts binary string to readable form
     return "{" + ",".join([hex(c) for c in binary_string]) + "}"
 
 if __name__ == '__main__':

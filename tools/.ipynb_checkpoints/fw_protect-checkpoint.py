@@ -70,8 +70,8 @@ def hmac_generation(metadata, ciphertext):
 #         key_list = f.readlines()
 #     key = key_list[1].rstrip()
 
-    
-    key = b'0123456789012345678901234567890123456789012345678901234567890123'
+    #Hardcoded key to test
+    key = b'0123456789012345678901234567890123456789012345678901234567890123' 
     
     #generates a new hmac object
     h = HMAC.new(key, digestmod=SHA256)
@@ -83,6 +83,7 @@ def hmac_generation(metadata, ciphertext):
     
     #returns that hmac
     return h.digest()
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Firmware Update Tool')
