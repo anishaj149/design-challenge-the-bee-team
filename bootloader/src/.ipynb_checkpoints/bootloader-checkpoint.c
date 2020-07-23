@@ -65,6 +65,9 @@ unsigned char hmac[HMAC_SIZE];
 // IV Buffer?
 unsigned char iv [IV_SIZE];
 
+// Key Declarations
+char CBC_key[16] = CBC;
+char hmac_key[16] = HMAC;
 
 int main(void) {
 
@@ -247,7 +250,7 @@ int verify_hmac(uint32_t version, uint32_t size, unsigned char *hmac, unsigned c
     
     // hardcoded stuff vvv
     size = 10;
-    char str[size + 4];
+    char str[14];
     strcpy(str, "howd");
     strcat(str, "thebeeteam");
     char* key = "0123456789012345678901234567890123456789012345678901234567890123";
@@ -260,13 +263,14 @@ int verify_hmac(uint32_t version, uint32_t size, unsigned char *hmac, unsigned c
     br_hmac_key_context kc;
     br_hmac_context ctx;
     
-    // br_hmac_key_init(&kc, digest_class, KEY, KEY_LEN); // non-hard-coded code
+    // br_hmac_key_init(&kc, digest_class, hmac_key, KEY_LEN); // non-hard-coded code
     br_hmac_key_init(&kc, digest_class, key, 64); // hard-coded data
     br_hmac_init(&ctx, &kc, 0);
     //br_hmac_update(&ctx, version, 4); // correct line of code to add version, size, and data to HMAC
     //br_hmac_update(&ctx, size, 4);
     //br_hmac_update(&ctx, data, data_len); 
-    br_hmac_update(&ctx, str, 14); // hard-coded data data
+    br_hmac_update(&ctx, str, 4); // hard-coded data data
+    br_hmac_update(&ctx, str, 10); // hard-coded data data
     br_hmac_out(&ctx, tmp);
         
     //hmac = tmp;
@@ -288,7 +292,7 @@ int verify_hmac(uint32_t version, uint32_t size, unsigned char *hmac, unsigned c
 //     for (int i = 0; i < sizeof(hmac); i+=4) {
 //         uart_write_hex(UART2, *((uint32_t*)(hmac + i)));
 //     }
-    return 0;  
+    return 1;  
 }
 
 // method checks if the given and calculated HMACs are the same
