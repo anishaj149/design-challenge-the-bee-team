@@ -16,13 +16,23 @@
 #include <stdlib.h>
 #include <string.h>
 
+// HMAC Imports
+#include "inc/bearssl_hmac.h"
+
 
 // Forward Declarations
 void load_initial_firmware(void);
 void load_firmware(void);
 void boot_firmware(void);
 long program_flash(uint32_t, unsigned char*, unsigned int);
+int verify_hmac(unsigned char *hmac, unsigned char *data);
+int is_same(char* hmac, char* tmp);
+
 int decrypt_firmware();
+
+
+int verify_hmac(uint32_t version, uint32_t size, unsigned char *hmac, unsigned char *data, unsigned int data_len);
+
 
 
 // Firmware Constants
@@ -44,6 +54,12 @@ int decrypt_firmware();
 #define UPDATE ((unsigned char)'U')
 #define BOOT ((unsigned char)'B')
 
+// define HMAC Constants
+#define HMAC_SIZE 32
+
+// define IV Constants
+#define IV_SIZE 16
+
 
 // Firmware v2 is embedded in bootloader
 extern int _binary_firmware_bin_start;
@@ -57,6 +73,17 @@ uint8_t *fw_release_message_address;
 
 // Firmware Buffer
 unsigned char data[FLASH_PAGESIZE];
+
+// HMAC Buffer?
+unsigned char hmac[HMAC_SIZE];
+
+// IV Buffer?
+unsigned char iv [IV_SIZE];
+
+
+//Define keys
+char cbc_key[16] = CBC;
+char hmac_key[16] = HMAC;
 
 
 int main(void) {
@@ -78,6 +105,8 @@ int main(void) {
   uart_write_str(UART2, "Welcome to the BWSI Vehicle Update Service!\n");
   uart_write_str(UART2, "Send \"U\" to update, and \"B\" to run the firmware.\n");
   uart_write_str(UART2, "Writing 0x20 to UART0 will reset the device.\n");
+    
+    verify_hmac(NULL, NULL);
 
   decrypt_firmware();
     
@@ -232,6 +261,18 @@ void load_firmware(void)
         data[data_index] = uart_read(UART1, BLOCKING, &read);
         data_index += 1;
     } //for
+      
+    // get iv bytes
+    for (int i = 0; i < IV_SIZE; i++) {
+        iv[i] = uart_read(UART1, BLOCKING, &read);
+    } // for
+    
+    // get HMAC bytes
+    for (int i = 0; i < HMAC_SIZE; i++) {
+        hmac[i] = uart_read(UART1, BLOCKING, &read);
+    } // for
+      
+    verify_hmac(hmac, data);
 
     if(!verify_hmac(*data[data_index - frame_length], *data[data_index - HMAC_SIZE])){ //beginning of data, beginning of hmac
             uart_write(UART1, ERROR_HMAC); // Reject the firmware
@@ -275,14 +316,38 @@ void load_firmware(void)
     } // if
   } // while(1)
 
-  
-  //Reset
 }
 
-int verify_hmac(uint32_t metadata, char data[]) {
+
+// verify if the data was modified by calculating a new hmac and comparing it to the given hmac (Integrity/Authenticity)
+// everything is currently hard-coded
+int verify_hmac(unsigned char *hmac, unsigned char *data) {    
+    // declare variables used to create HMAC
+    unsigned char tmp[32];
+    const br_hash_class *digest_class = &br_sha256_vtable;
+    br_hmac_key_context kc;
+    br_hmac_context ctx;
     
+    // Initialize the HMAC key and HMAC
+    br_hmac_key_init(&kc, digest_class, hmac_key, HMAC_SIZE);
+    br_hmac_init(&ctx, &kc, 0);
+    
+    // add data to be inside the HMAC
+    br_hmac_update(&ctx, data, sizeof(data));
+    
+    // write the calculated HMAC into tmp
+    br_hmac_out(&ctx, tmp);
+
+    // loop through each element of hmac and tmp and test if they are the same
+    if (is_same(hmac, tmp)) {
+        uart_write_str(UART2, "HMAC is Valid");
+        return 1;
+    } else {
+        uart_write_str(UART2, "HMAC is Invalid");
+    }
     return 0;  
 }
+
 
 
 int decrypt_firmware(){ //(char* iv, char* key, unsigned short KEY_LEN, char* data, unsigned short DATA_LEN) {
@@ -298,6 +363,11 @@ int decrypt_firmware(){ //(char* iv, char* key, unsigned short KEY_LEN, char* da
     br_aes_gen_cbcdec_keys v_dc;
     const br_block_cbcdec_class **dc;
     dc = &v_dc.vtable;
+
+
+
+
+
     
     //decoding the stuff in place ???
     vd->init(dc, key, KEY_LEN);
@@ -315,6 +385,29 @@ int decrypt_firmware(){ //(char* iv, char* key, unsigned short KEY_LEN, char* da
     return 1;
 }
 
+// method checks if the given and calculated HMACs are the same
+int is_same(char* hmac, char* tmp) {
+    int size = 0;
+    // get the HMAC with the greater size (tho they should be the same length ya never know)
+    if (sizeof(hmac) < sizeof(tmp)) {
+        size = sizeof(hmac);
+        size /= sizeof(hmac[0]);
+    } else {
+        size = sizeof(tmp);
+        size /= sizeof(tmp[0]);
+    }
+    
+    int equal = 1; // equals 0 when hmac and tmp are equal
+    for (int i = 0; i < size; i++) {
+        if (*(hmac + i) == *(tmp + i)) {
+            equal = 1; // set to a number for security --> time/power?
+        } else {
+            equal = 0;
+        }
+    }
+    
+    return equal;
+}
 
 /*
  * Program a stream of bytes to the flash.

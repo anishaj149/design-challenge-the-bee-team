@@ -21,4 +21,21 @@ Must add security measures to:
 - fw_update 
 - fw_protect
 
+<<<<<<< HEAD
     
+=======
+Our plan:
+
+Encryption:
+encrypt CBC (ciphertext)
+generate HMAC
+append to encryption
+encrypt CTR (ciphertext + HMAC)
+
+Decryption:
+decrypt CTR (ciphertext + HMAC)
+check HMAC
+decrypt CBC (ciphertext)
+
+Check version # (can't be an older version excluding 0)
+>>>>>>> origin/first_merge
