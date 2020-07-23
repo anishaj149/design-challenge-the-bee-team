@@ -25,11 +25,12 @@ import time
 from serial import Serial
 
 RESP_OK = b'\x00'
-FRAME_SIZE = 16
+HMAC_SIZE = 32
+FRAME_SIZE = 32 + HMAC_SIZE #firmware frame size plus indiv hmac for each thing
 
 
 def send_metadata(ser, metadata, debug=False):
-    version, size = struct.unpack_from('<HH', metadata)
+    version, size, version_hmac = struct.unpack_from('<HH', metadata)
     print(f'Version: {version}\nSize: {size} bytes\n')
 
     # Handshake for update
@@ -44,11 +45,13 @@ def send_metadata(ser, metadata, debug=False):
         print(metadata)
 
     ser.write(metadata)
-
+    
+    error_dct{0x1: 'HMAC is not verifiable', 0x2:'Version is wrong', 0x3:'Not enough space in flash'}
+    
     # Wait for an OK from the bootloader.
     resp = ser.read()
     if resp != RESP_OK:
-        raise RuntimeError("ERROR: Bootloader responded with {}".format(repr(resp)))
+        raise RuntimeError("ERROR: Bootloader responded with {}".format(error_dct[resp])
 
 
 def send_frame(ser, frame, debug=False):
@@ -57,15 +60,16 @@ def send_frame(ser, frame, debug=False):
     if debug:
         print(frame)
 
-    resp = ser.read()  # Wait for an OK from the bootloader
+    resp = ser.read()  # Wait for an OK from the bootloader that it was able to go to flash or that hmac did verify
 
     time.sleep(0.1)
-
+    
+    error_dct{0x1: 'HMAC is not verifiable', 0x2:'Version is wrong', 0x3:'Not enough space in flash'}
     if resp != RESP_OK:
-        raise RuntimeError("ERROR: Bootloader responded with {}".format(repr(resp)))
+        raise RuntimeError("ERROR: Bootloader responded with {}".format(error_dct[resp])#repr(resp)))
 
     if debug:
-        print("Resp: {}".format(ord(resp)))
+        print("Resp: {}".format(error_dct[resp])#ord(resp)))
 
 
 def main(ser, infile, debug):
@@ -73,13 +77,18 @@ def main(ser, infile, debug):
     with open(infile, 'rb') as fp:
         firmware_blob = fp.read()
 
-    metadata = firmware_blob[:4]
-    firmware = firmware_blob[4:]
+
+    metadata = firmware_blob[:4] 
+    metadata_HMAC = firmware_blob[4: 4+ HMAC_SIZE] #need to send the hmac for the version for InTeGrItY
+    firmware_and_hmacs = firmware_blob[HMAC_SIZE + 4:-32]
+    hmac = firmware_blob[-32:]
+    
 
     send_metadata(ser, metadata, debug=debug)
+    send_frame(ser, metadata_HMAC, debug = debug)
 
     for idx, frame_start in enumerate(range(0, len(firmware), FRAME_SIZE)):
-        data = firmware[frame_start: frame_start + FRAME_SIZE]
+        data = firmware_and_hmacs[frame_start: frame_start + FRAME_SIZE]
 
         # Get length of data.
         length = len(data)
@@ -98,6 +107,15 @@ def main(ser, infile, debug):
     # Send a zero length payload to tell the bootlader to finish writing its page.
     ser.write(struct.pack('>H', 0x0000))
 
+    length = len(hmac)
+    frame_fmt = '>H{}s'.format(length)
+    frame = struct.pack(frame_fmt, length, hmac)
+    
+    if debug:
+            print("Writing frame {} ({} bytes)...".format(idx, len(frame)))
+    
+    send_frame(ser, frame, debug=debug)
+    
     return ser
 
 
