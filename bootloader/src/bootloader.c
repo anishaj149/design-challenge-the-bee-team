@@ -17,7 +17,8 @@
 #include <string.h>
 
 // HMAC Imports
-#include "bearssl_hmac.h"
+#include "inc/bearssl_hmac.h"
+
 
 // Forward Declarations
 void load_initial_firmware(void);
@@ -31,7 +32,7 @@ int decrypt_firmware();
 
 
 int verify_hmac(uint32_t version, uint32_t size, unsigned char *hmac, unsigned char *data, unsigned int data_len);
->>>>>>> origin/first_merge
+
 
 
 // Firmware Constants
@@ -76,9 +77,11 @@ unsigned char hmac[HMAC_SIZE];
 // IV Buffer?
 unsigned char iv [IV_SIZE];
 
+
 //Define keys
 char cbc_key[16] = CBC;
 char hmac_key[16] = HMAC;
+
 
 int main(void) {
 
@@ -255,7 +258,16 @@ void load_firmware(void)
 
     uart_write(UART1, OK); // Acknowledge the frame.
   } // while(1)
+    
+    for (int i = 0; i < IV_SIZE; i++) {
+        iv[i] = uart_read(UART1, BLOCKING, &read);
+    }
+    
+    for (int i = 0; i < HMAC_SIZE; i++) {
+        hmac[i] = uart_read(UART1, BLOCKING, &read);
+    }
 }
+
 
 // verify if the data was modified by calculating a new hmac and comparing it to the given hmac (Integrity/Authenticity)
 // everything is currently hard-coded
