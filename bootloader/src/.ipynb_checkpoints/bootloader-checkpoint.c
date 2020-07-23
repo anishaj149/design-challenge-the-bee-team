@@ -65,10 +65,6 @@ unsigned char hmac[HMAC_SIZE];
 // IV Buffer?
 unsigned char iv [IV_SIZE];
 
-// Key Declarations
-char CBC_key[16];// = CBC;
-char hmac_key[16];// = HMAC;
-
 int main(void) {
 
   // Initialize UART channels
