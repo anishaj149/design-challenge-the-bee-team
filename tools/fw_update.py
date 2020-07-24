@@ -77,17 +77,19 @@ def main(ser, infile, debug):
     with open(infile, 'rb') as fp:
         firmware_blob = fp.read()
 
-
+    #splitting data up
     metadata = firmware_blob[:4] 
     metadata_HMAC = firmware_blob[4: 4+ HMAC_SIZE] #need to send the hmac for the version for InTeGrItY
     firmware_and_hmacs = firmware_blob[HMAC_SIZE + 4:-32]
     hmac = firmware_blob[-32:]
     
-
+    #sending metadata
     send_metadata(ser, metadata, debug=debug)
     frame = struct.pack(metadata_HMAC)
     send_frame(ser, frame, debug = debug)
 
+              
+    #sending the rest of the data
     for idx, frame_start in enumerate(range(0, len(firmware), FRAME_SIZE)):
         data = firmware_and_hmacs[frame_start: frame_start + FRAME_SIZE]
 
@@ -105,9 +107,10 @@ def main(ser, infile, debug):
 
     print("Done writing firmware.")
 
-    # Send a zero length payload to tell the bootlader to finish writing its page.
+    # Send a zero length payload to tell the bootloader to finish writing its page.
     ser.write(struct.pack('>H', 0x0000))
 
+    #Send the final hmac
     length = len(hmac)
     frame_fmt = '>H{}s'.format(length)
     frame = struct.pack(frame_fmt, length, hmac)
