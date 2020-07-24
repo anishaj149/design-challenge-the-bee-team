@@ -46,7 +46,7 @@ def send_metadata(ser, metadata, debug=False):
 
     ser.write(metadata)
     
-    error_dct{0x1: 'HMAC is not verifiable', 0x2:'Version is wrong', 0x3:'Not enough space in flash'}
+    error_dct = {0x1: 'HMAC is not verifiable', 0x2:'Version is wrong', 0x3:'Not enough space in flash'}
     
     # Wait for an OK from the bootloader.
     resp = ser.read()
@@ -64,7 +64,7 @@ def send_frame(ser, frame, debug=False):
 
     time.sleep(0.1)
     
-    error_dct{0x1: 'HMAC is not verifiable', 0x2:'Version is wrong', 0x3:'Not enough space in flash'}
+    error_dct = {0x1: 'HMAC is not verifiable', 0x2:'Version is wrong', 0x3:'Not enough space in flash'}
     if resp != RESP_OK:
         raise RuntimeError("ERROR: Bootloader responded with {}".format(error_dct[resp])#repr(resp)))
 
@@ -85,7 +85,8 @@ def main(ser, infile, debug):
     
     #sending metadata
     send_metadata(ser, metadata, debug=debug)
-    send_frame(ser, metadata_HMAC, debug = debug)
+    frame = struct.pack(metadata_HMAC)
+    send_frame(ser, frame, debug = debug)
 
               
     #sending the rest of the data

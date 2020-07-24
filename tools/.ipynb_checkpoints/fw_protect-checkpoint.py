@@ -4,10 +4,15 @@ Firmware Bundle-and-Protect Tool
 """
 import argparse
 import struct
+import pathlib
 
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad
 from Crypto.Hash import HMAC, SHA256
+
+
+FILE_DIR = pathlib.Path(__file__).parent.absolute()
+bootloader = FILE_DIR / '..' / 'bootloader'
 
 def protect_firmware(infile, outfile, version, message):
     # Load firmware binary from infile
@@ -30,7 +35,7 @@ def protect_firmware(infile, outfile, version, message):
     
     
     #takes 32 bytes of data, generates an hmac, and appends both to firmware_blob  
-    for i in range(0, len(firmware_iv_message), 32)
+    for i in range(0, len(firmware_iv_message), 32):
         firmware_blob += firmware_iv_message[i, i+32]
         firmware_blob += hmac_generation(firmware_iv_message[i, i+32])
     
@@ -49,7 +54,7 @@ def cbc_encryption(firmware):
     #How do i read the key from the text file? Which key will it be?
     #Append IVs to the end of the ciphertext
     #128 bit IV
-    with open('secret_build_output.txt','rb') as fp:
+    with open(bootloader/'secret_build_output.txt','rb') as fp:
         key = fp.readlines()  #Returns a list. Each line is an index in the list.
         key = key[-2]  #key should be 16 bytes long. 
         #The keys are generated with one line being CBC and the next line being HMAC
@@ -74,7 +79,7 @@ def cbc_encryption(firmware):
 def hmac_generation(input):
     
     #reading in a key from the secret file
-    with open("secret_build_output.txt", "rb") as f:
+    with open(bootloader/'secret_build_output.txt', "rb") as f:
         key_list = f.readlines()
     key = key_list[1].rstrip()
     

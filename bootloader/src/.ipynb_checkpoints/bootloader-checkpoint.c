@@ -17,7 +17,7 @@
 #include <string.h>
 
 // HMAC Imports
-#include "inc/bearssl_hmac.h"
+#include "bearssl_hmac.h"
 
 
 // Forward Declarations
@@ -25,22 +25,13 @@ void load_initial_firmware(void);
 void load_firmware(void);
 void boot_firmware(void);
 long program_flash(uint32_t, unsigned char*, unsigned int);
-int verify_hmac(unsigned char *hmac, unsigned char *data);
-int is_same(char* hmac, char* tmp);
-
-int decrypt_firmware();
-
-
-int verify_hmac(uint32_t version, uint32_t size, unsigned char *hmac, unsigned char *data, unsigned int data_len);
-
-
+int verify_hmac(unsigned int hmac_index, unsigned int data_index, unsigned int data_size);
+int is_same(unsigned char* hmac, unsigned char* tmp);
+int decrypt_firmware(unsigned char* iv, unsigned char* data, unsigned short DATA_LEN);
 
 // Firmware Constants
 #define METADATA_BASE 0xFC00  // base address of version and firmware size in Flash
 #define FW_BASE 0x10000  // base address of firmware in Flash
-#defube HMAC_SIZE 32
-#define IV_LEN 128
-
 
 // FLASH Constants
 #define FLASH_PAGESIZE 1024
@@ -60,6 +51,9 @@ int verify_hmac(uint32_t version, uint32_t size, unsigned char *hmac, unsigned c
 
 // define IV Constants
 #define IV_SIZE 16
+
+// define Key Constants
+#define CBC_KEY_LEN 16
 
 
 // Firmware v2 is embedded in bootloader
@@ -83,8 +77,8 @@ unsigned char iv [IV_SIZE];
 
 
 //Define keys
-char cbc_key[16] = CBC;
-char hmac_key[16] = HMAC;
+char CBC_KEY[] = CBC;
+char HMAC_KEY[] = HMAC;
 
 
 int main(void) {
@@ -106,11 +100,7 @@ int main(void) {
   uart_write_str(UART2, "Welcome to the BWSI Vehicle Update Service!\n");
   uart_write_str(UART2, "Send \"U\" to update, and \"B\" to run the firmware.\n");
   uart_write_str(UART2, "Writing 0x20 to UART0 will reset the device.\n");
-    
-    verify_hmac(NULL, NULL);
-
-  decrypt_firmware();
-    
+        
   int resp;
   while (1){
     uint32_t instruction = uart_read(UART1, BLOCKING, &resp);
@@ -183,20 +173,10 @@ void load_firmware(void)
   data[3] = uart_read(UART1, BLOCKING, &read);
   size |= (uint32_t)data[3] << 8;
 
-// Get two bytes for the length of metadata hmac
-  rcv = uart_read(UART1, BLOCKING, &read);
-  frame_length = (int)rcv << 8;
-  rcv = uart_read(UART1, BLOCKING, &read);
-  frame_length += (int)rcv;
-
-  // Write length debug message
-  uart_write_hex(UART2,(unsigned char)rcv);
-  nl(UART2);
-
-  
+    // get HMAC of metadata
   // Get the number of bytes specified 
   data_index = 4; //need to start at 4 because of the metadata len
-  for (int i = 0; i < frame_length; ++i){
+  for (int i = 0; i < HMAC_SIZE; ++i){
     data[data_index] = uart_read(UART1, BLOCKING, &read);
     data_index += 1;
   }
@@ -210,7 +190,7 @@ void load_firmware(void)
   nl(UART2);
 
   //HMAC verification for metadata
-  if(!verify_hmac(*data[0], *data[4])){
+  if(!verify_hmac(4, 0, 4)){
         uart_write(UART1, ERROR_HMAC); // Reject the firmware
         SysCtlReset(); // Reset device
         return;
@@ -259,7 +239,7 @@ void load_firmware(void)
         data_index += 1;
         }
         
-        if(!verify_hmac(*data[0], *data[data_index - HMAC_SIZE])){ //beginning of data, beginning of hmac
+        if(!verify_hmac(data_index - HMAC_SIZE, 0, size + IV_SIZE)){ //beginning of data, beginning of hmac
             uart_write(UART1, ERROR_HMAC); // Reject the firmware
             SysCtlReset(); // Reset device
             return;
@@ -275,9 +255,7 @@ void load_firmware(void)
         data_index += 1;
     } //for
       
-    verify_hmac(hmac, data);
-
-    if(!verify_hmac(*data[data_index - frame_length], *data[data_index - HMAC_SIZE])){ //beginning of data, beginning of hmac
+    if(!verify_hmac(data_index - HMAC_SIZE, data_index - frame_length, frame_length - HMAC_SIZE)){ //beginning of data, beginning of hmac
             uart_write(UART1, ERROR_HMAC); // Reject the firmware
             SysCtlReset(); // Reset device
             return;
@@ -290,14 +268,23 @@ void load_firmware(void)
   }
 //get all parts necessary for decrypt firmware
 //decrypt_firmware
-      IV = data[size - IV_LEN : size] //IV from the butt of data
-      decrypt_firmware(IV, CBC_KEY, 16, data[:size - IV_LEN], size - IV_LEN); //IV, key, key len, data, data len
+
+    unsigned char just_data[size];
+    // separate data and IV from data[]
+    for (int i = 0; i < size + IV_SIZE; i++) {
+        if (i >= size) {
+            iv[i] = data[i];
+        } else {
+            just_data[i] = data[i];
+        }
+    }
+    decrypt_firmware(iv, just_data, size); //IV, key, key len, data, data len
 
 //Now, data has all of the firmware, so we are going to put it all into flash. 
     //while(1){
     // If we filed our page buffer, program it
     int i;
-    for(i = 0; i < size - IV_LEN; i += FLASH_PAGESIZE){
+    for(i = 0; i < size - IV_SIZE; i += FLASH_PAGESIZE){
       if (program_flash(page_addr, data, i)){
         uart_write(UART1, ERROR_FLASH); // Reject the firmware
         SysCtlReset(); // Reset device
@@ -317,8 +304,8 @@ void load_firmware(void)
 
     } // for
     
-    if((size - IV_LEN) % FLAS_PAGESIZE){ //remainder in case there wasnt exactly % 1000
-    if (program_flash(page_addr, data, size - IV_LEN)){
+    if((size - IV_SIZE) % FLASH_PAGESIZE){ //remainder in case there wasnt exactly % 1000
+    if (program_flash(page_addr, data, size - IV_SIZE)){
         uart_write(UART1, ERROR_FLASH); // Reject the firmware
         SysCtlReset(); // Reset device
         return;
@@ -339,7 +326,7 @@ void load_firmware(void)
 
 // verify if the data was modified by calculating a new hmac and comparing it to the given hmac (Integrity/Authenticity)
 // everything is currently hard-coded
-int verify_hmac(unsigned char *hmac, unsigned char *data) {    
+int verify_hmac(unsigned int hmac_index, unsigned int data_index, unsigned int data_size) {    
     // declare variables used to create HMAC
     unsigned char tmp[32];
     const br_hash_class *digest_class = &br_sha256_vtable;
@@ -347,11 +334,23 @@ int verify_hmac(unsigned char *hmac, unsigned char *data) {
     br_hmac_context ctx;
     
     // Initialize the HMAC key and HMAC
-    br_hmac_key_init(&kc, digest_class, hmac_key, HMAC_SIZE);
+    br_hmac_key_init(&kc, digest_class, HMAC_KEY, HMAC_SIZE);
     br_hmac_init(&ctx, &kc, 0);
     
+    unsigned char hmac_data[data_size];
+    for (int i = 0; i < data_size; i++) {
+        hmac_data[i] = data[data_index];
+        data_index++;
+    }
+    
+    unsigned char hmac[HMAC_SIZE];
+    for(int i = 0; i < HMAC_SIZE; i++){
+        hmac[i] = data[hmac_index];
+        hmac_index++;
+    }
+    
     // add data to be inside the HMAC
-    br_hmac_update(&ctx, data, sizeof(data));
+    br_hmac_update(&ctx, hmac_data, data_size);
     
     // write the calculated HMAC into tmp
     br_hmac_out(&ctx, tmp);
@@ -366,11 +365,7 @@ int verify_hmac(unsigned char *hmac, unsigned char *data) {
     return 0;  
 }
 
-
-
-
-
-int decrypt_firmware(char* iv, char* data, unsigned short DATA_LEN) {
+int decrypt_firmware(unsigned char* iv, unsigned char* data, unsigned short DATA_LEN) {
     /*char* iv = "\xa8\xe8\x8c\xfd~\x97w\xca\xd0\xc5\x7f\x89]u`\xd6";
 
 int decrypt_firmware(char* iv, char* key, unsigned short KEY_LEN, char* data, unsigned short DATA_LEN) {
@@ -381,7 +376,6 @@ int decrypt_firmware(char* iv, char* key, unsigned short KEY_LEN, char* data, un
     char* data = "`MU*\x00#o\x1e\xbe\xcb\xb7W\x1a\xbeU\xcf\x1ce\xe3b\xc0e\x9e]\xd6\xe6R\xf1\xc6m\xd2\xc8s?\x99\xad\xfff\xbejL\xf0(2e\x88d";
     unsigned short DATA_LEN = 0x30;*/
 
-
     //all the AES CBC stuff
     const br_block_cbcdec_class * vd = &br_aes_big_cbcdec_vtable;
     br_aes_gen_cbcdec_keys v_dc;
@@ -389,12 +383,12 @@ int decrypt_firmware(char* iv, char* key, unsigned short KEY_LEN, char* data, un
     dc = &v_dc.vtable;
     
     //decoding the stuff in place ???
-    vd->init(dc, CBC_KEY , KEY_LEN);
+    vd->init(dc, CBC_KEY, CBC_KEY_LEN);
     vd->run(dc, iv, data, DATA_LEN);
     
     //transmitting all the decoded data on UART2 for debugging purpuses
     data[47] = '\0';
-    uart_write_str(UART2, data);
+    uart_write_str(UART2, (char *)data);
     /*int i = 0;
     while(data[i] != '\0') {
         uart_write_str(UART2, data[i]); //check wtf is this thing
@@ -405,7 +399,7 @@ int decrypt_firmware(char* iv, char* key, unsigned short KEY_LEN, char* data, un
 }
 
 // method checks if the given and calculated HMACs are the same
-int is_same(char* hmac, char* tmp) {
+int is_same(unsigned char* hmac, unsigned char* tmp) {
     int size = 0;
     // get the HMAC with the greater size (tho they should be the same length ya never know)
     if (sizeof(hmac) < sizeof(tmp)) {

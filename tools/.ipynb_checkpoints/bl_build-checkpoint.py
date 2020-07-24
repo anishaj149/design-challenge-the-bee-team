@@ -40,11 +40,10 @@ def make_bootloader():
     os.chdir(bootloader)
 
     subprocess.call('make clean', shell=True)
-   # status = subprocess.call('make',shell=True)  #Makes us able to pass in commands
-    with open('secret_build_output.txt','rb') as fp:
-        key = fp.readlines()
-    status = subprocess.call(f'make KEY={to_c_array(key[0])}', shell=True) #Makes us able to pass in commands make the key command anything you want. 
-    status = subprocess.call(f'make KEY={to_c_array(key[1])}', shell=True) #Makes us able to pass in commands make the key command anything you want. 
+    
+    key = gen_keys()  #Have to run this first so the keys are generated
+        
+    status = subprocess.call(f'make CBC={to_c_array(key[0])} HMAC={to_c_array(key[1])}' , shell=True) #Makes us able to pass in commands make the key command anything you want. 
     
     # Return True if make returned 0, otherwise return False.
     return (status == 0)
@@ -52,12 +51,13 @@ def make_bootloader():
 def gen_keys():  #Have to generate one CBC key and one HMAC key
     cbc_key = secrets.token_bytes(16)  #generates a key of 16 bytes for CBC
     hmac_key = secrets.token_bytes(32) #Generates a key of 32 bytes for HMAC
-    with open('secret_build_output.txt','wb') as fp:  #Opens the file which stores keys
+    with open('secret_build_output.txt','wb+') as fp:  #Opens the file which stores keys
         fp.write(cbc_key)  #Writes the cbc key
         fp.write(b'\n')    #Writes a newline to separate the keys
         fp.write(hmac_key) #Writes the hmac key
         fp.write(b'\n')  #writes a newline to separate from the next cbc key
-        
+       
+    return (cbc_key, hmac_key)
         
 def to_c_array(binary_string): #Converts binary string to readable form
     return "{" + ",".join([hex(c) for c in binary_string]) + "}"
@@ -77,6 +77,5 @@ if __name__ == '__main__':
                 binary_path))
 
     copy_initial_firmware(binary_path)
-    gen_keys()
-    make_bootloader()
-    
+    make_bootloader()  #takes the keys and moves them to the bootloader
+
