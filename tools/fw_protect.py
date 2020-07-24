@@ -71,7 +71,7 @@ def cbc_encryption(firmware):
     
     return final_encrypt  #returns CBC encryption
     
-def hmac_generation(metadata, ciphertext):
+def hmac_generation(input):
     
     #reading in a key from the secret file
     with open("secret_build_output.txt", "rb") as f:
@@ -82,8 +82,8 @@ def hmac_generation(metadata, ciphertext):
     h = HMAC.new(key, digestmod=SHA256)
     
     #makes an hmac for the unencrypted metadata and the encrypted firmware
-    h.update(metadata)
-    h.update(ciphertext)
+    h.update(input)
+    
     
     
     #returns that hmac
