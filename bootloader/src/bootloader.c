@@ -175,6 +175,7 @@ void load_firmware(void)
   data[3] = uart_read(UART1, BLOCKING, &read);
   size |= (uint32_t)data[3] << 8;
 
+    // get HMAC of metadata
   // Get the number of bytes specified 
   data_index = 4; //need to start at 4 because of the metadata len
   for (int i = 0; i < HMAC_SIZE; ++i){
