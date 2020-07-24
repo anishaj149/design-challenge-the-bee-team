@@ -77,8 +77,8 @@ unsigned char iv [IV_SIZE];
 
 
 //Define keys
-char CBC_KEY[16] = CBC;
-char HMAC_KEY[16] = HMAC;
+char CBC_KEY[] = CBC;
+char HMAC_KEY[] = HMAC;
 
 
 int main(void) {
