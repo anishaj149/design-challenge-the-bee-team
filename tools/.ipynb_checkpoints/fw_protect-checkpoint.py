@@ -5,7 +5,6 @@ Firmware Bundle-and-Protect Tool
 import argparse
 import struct
 
-
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad
 from Crypto.Hash import HMAC, SHA256
@@ -18,7 +17,7 @@ def protect_firmware(infile, outfile, version, message):
     #encrypts the firmware w cbc mode aes-128, adds an iv to the end
     enc_firmware_iv = cbc_encryption(firmware)
     
-    # Pack version and size into two little-endian shorts
+    # Pack version and size (of only the firmware!) into two little-endian shorts
     metadata = struct.pack('<HH', version, len(firmware))
     
     # Append null-terminated release message to end of firmware
