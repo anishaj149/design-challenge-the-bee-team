@@ -27,7 +27,7 @@ void boot_firmware(void);
 long program_flash(uint32_t, unsigned char*, unsigned int);
 int verify_hmac(unsigned int hmac_index, unsigned int data_index, unsigned int data_size);
 int is_same(unsigned char* hmac, unsigned char* tmp);
-int decrypt_firmware();
+int decrypt_firmware(unsigned char* iv, unsigned char* data, unsigned short DATA_LEN);
 
 // Firmware Constants
 #define METADATA_BASE 0xFC00  // base address of version and firmware size in Flash
@@ -100,9 +100,7 @@ int main(void) {
   uart_write_str(UART2, "Welcome to the BWSI Vehicle Update Service!\n");
   uart_write_str(UART2, "Send \"U\" to update, and \"B\" to run the firmware.\n");
   uart_write_str(UART2, "Writing 0x20 to UART0 will reset the device.\n");
-    
-  decrypt_firmware();
-    
+        
   int resp;
   while (1){
     uint32_t instruction = uart_read(UART1, BLOCKING, &resp);
@@ -271,7 +269,7 @@ void load_firmware(void)
 //get all parts necessary for decrypt firmware
 //decrypt_firmware
 
-    char just_data[size];
+    unsigned char just_data[size];
     // separate data and IV from data[]
     for (int i = 0; i < size + IV_SIZE; i++) {
         if (i >= size) {
@@ -280,7 +278,7 @@ void load_firmware(void)
             just_data[i] = data[i];
         }
     }
-    decrypt_firmware(iv, CBC_KEY, 16, just_data, size); //IV, key, key len, data, data len
+    decrypt_firmware(iv, just_data, size); //IV, key, key len, data, data len
 
 //Now, data has all of the firmware, so we are going to put it all into flash. 
     //while(1){
@@ -367,7 +365,7 @@ int verify_hmac(unsigned int hmac_index, unsigned int data_index, unsigned int d
     return 0;  
 }
 
-int decrypt_firmware(char* iv, char* data, unsigned short DATA_LEN) {
+int decrypt_firmware(unsigned char* iv, unsigned char* data, unsigned short DATA_LEN) {
     /*char* iv = "\xa8\xe8\x8c\xfd~\x97w\xca\xd0\xc5\x7f\x89]u`\xd6";
 
 int decrypt_firmware(char* iv, char* key, unsigned short KEY_LEN, char* data, unsigned short DATA_LEN) {
@@ -385,12 +383,12 @@ int decrypt_firmware(char* iv, char* key, unsigned short KEY_LEN, char* data, un
     dc = &v_dc.vtable;
     
     //decoding the stuff in place ???
-    vd->init(dc, key, CBC_KEY_LEN);
+    vd->init(dc, CBC_KEY, CBC_KEY_LEN);
     vd->run(dc, iv, data, DATA_LEN);
     
     //transmitting all the decoded data on UART2 for debugging purpuses
     data[47] = '\0';
-    uart_write_str(UART2, data);
+    uart_write_str(UART2, (char *)data);
     /*int i = 0;
     while(data[i] != '\0') {
         uart_write_str(UART2, data[i]); //check wtf is this thing
