@@ -5,7 +5,6 @@ Firmware Bundle-and-Protect Tool
 import argparse
 import struct
 
-
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad
 from Crypto.Hash import HMAC, SHA256
