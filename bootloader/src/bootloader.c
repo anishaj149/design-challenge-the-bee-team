@@ -32,8 +32,6 @@ int decrypt_firmware();
 // Firmware Constants
 #define METADATA_BASE 0xFC00  // base address of version and firmware size in Flash
 #define FW_BASE 0x10000  // base address of firmware in Flash
-#define HMAC_SIZE 32
-
 
 // FLASH Constants
 #define FLASH_PAGESIZE 1024
@@ -53,6 +51,9 @@ int decrypt_firmware();
 
 // define IV Constants
 #define IV_SIZE 16
+
+// define Key Constants
+#define CBC_KEY_LEN 16
 
 
 // Firmware v2 is embedded in bootloader
@@ -76,8 +77,8 @@ unsigned char iv [IV_SIZE];
 
 
 //Define keys
-char cbc_key[16] = CBC;
-char hmac_key[16] = HMAC;
+char CBC_KEY[16] = CBC;
+char HMAC_KEY[16] = HMAC;
 
 
 int main(void) {
@@ -116,10 +117,23 @@ int main(void) {
 }
 
 
+
 /*
  * Load initial firmware into flash
  */
 void load_initial_firmware(void) {
+
+  if (*((uint32_t*)(METADATA_BASE+512)) != 0){
+    /*
+     * Default Flash startup state in QEMU is all zeros since it is
+     * secretly a RAM region for emulation purposes. Only load initial
+     * firmware when metadata page is all zeros. Do this by checking
+     * 4 bytes at the half-way point, since the metadata page is filled
+     * with 0xFF after an erase in this function (program_flash()).
+     */
+    return;
+  }
+
   int size = (int)&_binary_firmware_bin_size;
   int *data = (int *)&_binary_firmware_bin_start;
     
@@ -134,7 +148,6 @@ void load_initial_firmware(void) {
   }
   program_flash(FW_BASE + (i * FLASH_PAGESIZE), ((unsigned char *) data) + (i * FLASH_PAGESIZE), size % FLASH_PAGESIZE);
 }
-
 
 /*
  * Load the firmware into flash.
@@ -227,7 +240,7 @@ void load_firmware(void)
         data_index += 1;
         }
         
-        if(!verify_hmac(data_index - HMAC_SIZE, 0, size)){ //beginning of data, beginning of hmac
+        if(!verify_hmac(data_index - HMAC_SIZE, 0, size + IV_SIZE)){ //beginning of data, beginning of hmac
             uart_write(UART1, ERROR_HMAC); // Reject the firmware
             SysCtlReset(); // Reset device
             return;
@@ -248,7 +261,7 @@ void load_firmware(void)
             SysCtlReset(); // Reset device
             return;
         }
-    //discard hmac so only fw will go to flash
+    //discard hmac so only fw will go to flash (this is the end of the IV frame)
     data_index -= HMAC_SIZE;
       
     
@@ -256,14 +269,24 @@ void load_firmware(void)
   }
 //get all parts necessary for decrypt firmware
 //decrypt_firmware
-      decrypt_firmware();
+
+    char just_data[size];
+    // separate data and IV from data[]
+    for (int i = 0; i < size + IV_SIZE; i++) {
+        if (i >= size) {
+            iv[i] = data[i];
+        } else {
+            just_data[i] = data[i];
+        }
+    }
+    decrypt_firmware(iv, CBC_KEY, 16, just_data, size); //IV, key, key len, data, data len
 
 //Now, data has all of the firmware, so we are going to put it all into flash. 
-    while(1){
+    //while(1){
     // If we filed our page buffer, program it
-    if (data_index == FLASH_PAGESIZE || frame_length == 0) {
-      // Try to write flash and check for error
-      if (program_flash(page_addr, data, data_index)){
+    int i;
+    for(i = 0; i < size - IV_SIZE; i += FLASH_PAGESIZE){
+      if (program_flash(page_addr, data, i)){
         uart_write(UART1, ERROR_FLASH); // Reject the firmware
         SysCtlReset(); // Reset device
         return;
@@ -276,14 +299,28 @@ void load_firmware(void)
       uart_write_hex(UART2, data_index);
       nl(UART2);
 #endif
-
       // Update to next page
       page_addr += FLASH_PAGESIZE;
-      data_index = 0;
 
 
-    } // if
-  } // while(1)
+    } // for
+    
+    if((size - IV_SIZE) % FLASH_PAGESIZE){ //remainder in case there wasnt exactly % 1000
+    if (program_flash(page_addr, data, size - IV_SIZE)){
+        uart_write(UART1, ERROR_FLASH); // Reject the firmware
+        SysCtlReset(); // Reset device
+        return;
+      }
+#if 1
+      // Write debugging messages to UART2.
+      uart_write_str(UART2, "Page successfully programmed\nAddress: ");
+      uart_write_hex(UART2, page_addr);
+      uart_write_str(UART2, "\nBytes: ");
+      uart_write_hex(UART2, data_index);
+      nl(UART2);
+#endif
+    }
+      
 
 }
 
@@ -298,7 +335,7 @@ int verify_hmac(unsigned int hmac_index, unsigned int data_index, unsigned int d
     br_hmac_context ctx;
     
     // Initialize the HMAC key and HMAC
-    br_hmac_key_init(&kc, digest_class, hmac_key, HMAC_SIZE);
+    br_hmac_key_init(&kc, digest_class, HMAC_KEY, HMAC_SIZE);
     br_hmac_init(&ctx, &kc, 0);
     
     unsigned char hmac_data[data_size];
@@ -331,11 +368,11 @@ int verify_hmac(unsigned int hmac_index, unsigned int data_index, unsigned int d
 
 
 
-int decrypt_firmware(){ //(char* iv, char* key, unsigned short KEY_LEN, char* data, unsigned short DATA_LEN) {
+int decrypt_firmware(char* iv, char* key, unsigned short CBC_KEY_LEN, char* data, unsigned short DATA_LEN) {
     char iv[16] = {0x50,0xea,0x92,0xec,0xb5,0x1f,0x5c,0x20,0xd,0x13,0xa6,0x30,0xed,0x6c,0x6b,0xcd};
-    unsigned short KEY_LEN =  0x10;
-    char* key = "AAAAAAAAAAAAAAAA";
-    char data[48] = {0xae,0xd,0x2f,0xe5,0x74,0x98,0xce,0xc5,0x63,0x17,0x69,0xa5,0x62,0xa1,0x8e,0x47,0x4d,0x37,0xb5,0xad,0x4d,0xda,0x97,0xd0,0xb3,0x51,0x2c,0xe4,0x8e,0x2f,0xa7,0x34,0x31,0xca,0x8c,0xaa,0xdb,0x5,0xe6,0x14,0x24,0x56,0x40,0xf7,0xb8,0x20,0x6,0x3e};
+    unsigned short CBC_KEY_LEN =  0x10;
+    //char* key = "AAAAAAAAAAAAAAAA";
+    //char data[48] = {0xae,0xd,0x2f,0xe5,0x74,0x98,0xce,0xc5,0x63,0x17,0x69,0xa5,0x62,0xa1,0x8e,0x47,0x4d,0x37,0xb5,0xad,0x4d,0xda,0x97,0xd0,0xb3,0x51,0x2c,0xe4,0x8e,0x2f,0xa7,0x34,0x31,0xca,0x8c,0xaa,0xdb,0x5,0xe6,0x14,0x24,0x56,0x40,0xf7,0xb8,0x20,0x6,0x3e};
     unsigned short DATA_LEN = 0x30;
 
     
@@ -351,7 +388,7 @@ int decrypt_firmware(){ //(char* iv, char* key, unsigned short KEY_LEN, char* da
 
     
     //decoding the stuff in place ???
-    vd->init(dc, key, KEY_LEN);
+    vd->init(dc, key, CBC_KEY_LEN);
     vd->run(dc, iv, data, DATA_LEN);
     
     //transmitting all the decoded data on UART2 for debugging purpuses

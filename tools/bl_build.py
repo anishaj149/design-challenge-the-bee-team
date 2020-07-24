@@ -78,4 +78,4 @@ if __name__ == '__main__':
 
     copy_initial_firmware(binary_path)
     make_bootloader()  #takes the keys and moves them to the bootloader
-  
+
