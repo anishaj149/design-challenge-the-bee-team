@@ -85,7 +85,8 @@ def main(ser, infile, debug):
     
 
     send_metadata(ser, metadata, debug=debug)
-    send_frame(ser, metadata_HMAC, debug = debug)
+    frame = struct.pack(metadata_HMAC)
+    send_frame(ser, frame, debug = debug)
 
     for idx, frame_start in enumerate(range(0, len(firmware), FRAME_SIZE)):
         data = firmware_and_hmacs[frame_start: frame_start + FRAME_SIZE]
