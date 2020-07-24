@@ -43,9 +43,8 @@ def make_bootloader():
    # status = subprocess.call('make',shell=True)  #Makes us able to pass in commands
     with open('secret_build_output.txt','rb') as fp:
         key = fp.readlines()
-        
     status = subprocess.call(f'make KEY={to_c_array(key[0])}', shell=True) #Makes us able to pass in commands make the key command anything you want. 
-    status = subprocess.call(f'make KEY={to_c_array(key[1])}', shell=True)
+    status = subprocess.call(f'make KEY={to_c_array(key[1])}', shell=True) #Makes us able to pass in commands make the key command anything you want. 
     
     # Return True if make returned 0, otherwise return False.
     return (status == 0)
@@ -78,6 +77,6 @@ if __name__ == '__main__':
                 binary_path))
 
     copy_initial_firmware(binary_path)
-    gen_keys()  #Have to run this first so the keys are generated
-    make_bootloader()  #takes the keys and moves them to the bootloader
-  
+    gen_keys()
+    make_bootloader()
+    
