@@ -367,26 +367,22 @@ int verify_hmac(unsigned int hmac_index, unsigned int data_index, unsigned int d
     return 0;  
 }
 
+int decrypt_firmware(char* iv, char* data, unsigned short DATA_LEN) {
+    /*char* iv = "\xa8\xe8\x8c\xfd~\x97w\xca\xd0\xc5\x7f\x89]u`\xd6";
 
-
-int decrypt_firmware(char* iv, char* key, unsigned short CBC_KEY_LEN, char* data, unsigned short DATA_LEN) {
+int decrypt_firmware(char* iv, char* key, unsigned short KEY_LEN, char* data, unsigned short DATA_LEN) {
     char iv[16] = {0x50,0xea,0x92,0xec,0xb5,0x1f,0x5c,0x20,0xd,0x13,0xa6,0x30,0xed,0x6c,0x6b,0xcd};
-    unsigned short CBC_KEY_LEN =  0x10;
-    //char* key = "AAAAAAAAAAAAAAAA";
-    //char data[48] = {0xae,0xd,0x2f,0xe5,0x74,0x98,0xce,0xc5,0x63,0x17,0x69,0xa5,0x62,0xa1,0x8e,0x47,0x4d,0x37,0xb5,0xad,0x4d,0xda,0x97,0xd0,0xb3,0x51,0x2c,0xe4,0x8e,0x2f,0xa7,0x34,0x31,0xca,0x8c,0xaa,0xdb,0x5,0xe6,0x14,0x24,0x56,0x40,0xf7,0xb8,0x20,0x6,0x3e};
-    unsigned short DATA_LEN = 0x30;
 
-    
+    unsigned short KEY_LEN =  0x10;
+    char* key = "AAAAAAAAAAAAAAAA";
+    char* data = "`MU*\x00#o\x1e\xbe\xcb\xb7W\x1a\xbeU\xcf\x1ce\xe3b\xc0e\x9e]\xd6\xe6R\xf1\xc6m\xd2\xc8s?\x99\xad\xfff\xbejL\xf0(2e\x88d";
+    unsigned short DATA_LEN = 0x30;*/
+
     //all the AES CBC stuff
     const br_block_cbcdec_class * vd = &br_aes_big_cbcdec_vtable;
     br_aes_gen_cbcdec_keys v_dc;
     const br_block_cbcdec_class **dc;
     dc = &v_dc.vtable;
-
-
-
-
-
     
     //decoding the stuff in place ???
     vd->init(dc, key, CBC_KEY_LEN);
