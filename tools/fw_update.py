@@ -28,9 +28,10 @@ RESP_OK = b'\x00'
 HMAC_SIZE = 32
 FRAME_SIZE = 32 + HMAC_SIZE #firmware frame size plus indiv hmac for each thing
 
+error_dct = {b'\0x1': 'HMAC is not verifiable', b'\0x2':'Version is wrong', b'\0x3':'Not enough space in flash'}
 
-def send_metadata(ser, metadata, debug=False):
-    version, size, version_hmac = struct.unpack_from('<HH', metadata)
+def send_metadata(ser, metadata, metadata_HMAC, debug=False):
+    version, size = struct.unpack_from('<HH', metadata)
     print(f'Version: {version}\nSize: {size} bytes\n')
 
     # Handshake for update
@@ -46,32 +47,49 @@ def send_metadata(ser, metadata, debug=False):
 
     ser.write(metadata)
     
-    error_dct = {0x1: 'HMAC is not verifiable', 0x2:'Version is wrong', 0x3:'Not enough space in flash'}
-    
     # Wait for an OK from the bootloader.
     resp = ser.read()
     if resp != RESP_OK:
-        raise RuntimeError("ERROR: Bootloader responded with {}".format(error_dct[resp])
-
-
+        raise RuntimeError("ERROR: Bootloader responded with {}".format(error_dct[resp]))
+    
+    ser.write(metadata_HMAC)
+        
+    # Wait for an OK from the bootloader.
+    resp = ser.read()
+    if resp != RESP_OK:
+        raise RuntimeError("ERROR: Bootloader responded with {}".format(error_dct[resp]))
+              
+                           
 def send_frame(ser, frame, debug=False):
     ser.write(frame)  # Write the frame...
-
+    
+    print(frame)
+    
     if debug:
         print(frame)
 
     resp = ser.read()  # Wait for an OK from the bootloader that it was able to go to flash or that hmac did verify
 
-    time.sleep(0.1)
+    #time.sleep(0.1)
     
-    error_dct = {0x1: 'HMAC is not verifiable', 0x2:'Version is wrong', 0x3:'Not enough space in flash'}
+    #if resp != RESP_OK:
+    #    raise RuntimeError("ERROR: Bootloader responded with {}".format(error_dct[resp]))#repr(resp)))
+
+    #if debug:
+    #    print("Resp: {}".format(error_dct[resp]))#ord(resp)))
+        
+def send_hmac(ser, hmac, debug=False):
+    
+    ser.write(hmac)
+    # Wait for an OK from the bootloader.
+    resp = ser.read()
     if resp != RESP_OK:
-        raise RuntimeError("ERROR: Bootloader responded with {}".format(error_dct[resp])#repr(resp)))
-
+        raise RuntimeError("ERROR: Bootloader responded with {}".format(error_dct[resp]))
+             
     if debug:
-        print("Resp: {}".format(error_dct[resp])#ord(resp)))
-
-
+        print("Resp: {}".format(error_dct[resp]))#ord(resp)))
+        
+            
 def main(ser, infile, debug):
     # Open serial port. Set baudrate to 115200. Set timeout to 2 seconds.
     with open(infile, 'rb') as fp:
@@ -80,18 +98,15 @@ def main(ser, infile, debug):
     #splitting data up
     metadata = firmware_blob[:4] 
     metadata_HMAC = firmware_blob[4: 4+ HMAC_SIZE] #need to send the hmac for the version for InTeGrItY
-    firmware_and_hmacs = firmware_blob[HMAC_SIZE + 4:-32]
+    firmware_and_hmacs = firmware_blob[HMAC_SIZE + 4:-32] # error on this line
     hmac = firmware_blob[-32:]
     
     #sending metadata
-    send_metadata(ser, metadata, debug=debug)
-    frame = struct.pack(metadata_HMAC)
-    send_frame(ser, frame, debug = debug)
-
+    send_metadata(ser, metadata, metadata_HMAC, debug=debug)
               
     #sending the rest of the data
-    for idx, frame_start in enumerate(range(0, len(firmware), FRAME_SIZE)):
-        data = firmware_and_hmacs[frame_start: frame_start + FRAME_SIZE]
+    for idx, frame_start in enumerate(range(0, len(firmware_and_hmacs), FRAME_SIZE)):
+        data = firmware_and_hmacs[frame_start: frame_start + FRAME_SIZE - HMAC_SIZE]
 
         # Get length of data.
         length = len(data)
@@ -104,7 +119,10 @@ def main(ser, infile, debug):
             print("Writing frame {} ({} bytes)...".format(idx, len(frame)))
 
         send_frame(ser, frame, debug=debug)
-
+        
+        hmac = firmware_and_hmacs[frame_start + FRAME_SIZE - HMAC_SIZE: frame_start + FRAME_SIZE]
+        send_hmac(ser, hmac, debug-debug)
+        
     print("Done writing firmware.")
 
     # Send a zero length payload to tell the bootloader to finish writing its page.

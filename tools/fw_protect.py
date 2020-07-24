@@ -36,8 +36,8 @@ def protect_firmware(infile, outfile, version, message):
     
     #takes 32 bytes of data, generates an hmac, and appends both to firmware_blob  
     for i in range(0, len(firmware_iv_message), 32):
-        firmware_blob += firmware_iv_message[i, i+32]
-        firmware_blob += hmac_generation(firmware_iv_message[i, i+32])
+        firmware_blob += firmware_iv_message[i: i+32]
+        firmware_blob += hmac_generation(firmware_iv_message[i: i+32])
     
     #appends an hmac of all the *data* onto the very end of the entire firmware blob
     firmware_blob += hmac_generation(firmware_iv_message)

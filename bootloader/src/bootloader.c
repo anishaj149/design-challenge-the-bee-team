@@ -135,7 +135,7 @@ void load_initial_firmware(void) {
   int size = (int)&_binary_firmware_bin_size;
   int *data = (int *)&_binary_firmware_bin_start;
     
-  uint16_t version = 2;
+  uint16_t version = 2; // is this supposed to be version 1?
   uint32_t metadata = (((uint16_t) size & 0xFFFF) << 16) | (version & 0xFFFF);
   program_flash(METADATA_BASE, (uint8_t*)(&metadata), 4);
   fw_release_message_address = (uint8_t *) "This is the initial release message.";
@@ -173,14 +173,7 @@ void load_firmware(void)
   data[3] = uart_read(UART1, BLOCKING, &read);
   size |= (uint32_t)data[3] << 8;
 
-    // get HMAC of metadata
-  // Get the number of bytes specified 
-  data_index = 4; //need to start at 4 because of the metadata len
-  for (int i = 0; i < HMAC_SIZE; ++i){
-    data[data_index] = uart_read(UART1, BLOCKING, &read);
-    data_index += 1;
-  }
-        
+            
   // confirmation messages
   uart_write_str(UART2, "Received Firmware Version: ");
   uart_write_hex(UART2, version);
@@ -188,6 +181,16 @@ void load_firmware(void)
   uart_write_str(UART2, "Received Firmware Size: ");
   uart_write_hex(UART2, size);
   nl(UART2);
+    
+  uart_write(UART1, OK);
+    // get HMAC of metadata
+  // Get the number of bytes specified 
+  data_index = 4; //need to start at 4 because of the metadata len
+  for (int i = 0; i < HMAC_SIZE; ++i){
+    data[data_index] = uart_read(UART1, BLOCKING, &read);
+    data_index += 1;
+  }
+  //uart_write(UART1, OK);
 
   //HMAC verification for metadata
   if(!verify_hmac(4, 0, 4)){
@@ -195,7 +198,7 @@ void load_firmware(void)
         SysCtlReset(); // Reset device
         return;
     }
-      
+
   // Compare to old version and abort if older (note special case for version 0).
   uint16_t old_version = *fw_version_address;  
   if (version != 0 && version < old_version) {
@@ -206,7 +209,7 @@ void load_firmware(void)
     // If debug firmware, don't change version
     version = old_version;
   }
-
+    
   // Write new firmware size and version to Flash
   // Create 32 bit word for flash programming, version is at lower address, size is at higher address
   uint32_t metadata = ((size & 0xFFFF) << 16) | (version & 0xFFFF);
@@ -255,14 +258,14 @@ void load_firmware(void)
         data_index += 1;
     } //for
       
+      //             first index of HMAC       first index of data          length of data
     if(!verify_hmac(data_index - HMAC_SIZE, data_index - frame_length, frame_length - HMAC_SIZE)){ //beginning of data, beginning of hmac
-            uart_write(UART1, ERROR_HMAC); // Reject the firmware
-            SysCtlReset(); // Reset device
-            return;
-        }
+        uart_write(UART1, ERROR_HMAC); // Reject the firmware
+        SysCtlReset(); // Reset device
+        return;
+    }
     //discard hmac so only fw will go to flash (this is the end of the IV frame)
     data_index -= HMAC_SIZE;
-      
     
     uart_write(UART1, OK); // Acknowledge the frame.
   }
@@ -326,8 +329,9 @@ void load_firmware(void)
 
 // verify if the data was modified by calculating a new hmac and comparing it to the given hmac (Integrity/Authenticity)
 // everything is currently hard-coded
-int verify_hmac(unsigned int hmac_index, unsigned int data_index, unsigned int data_size) {    
+int verify_hmac(unsigned int hmac_index, unsigned int data_f_index, unsigned int data_size) {    
     // declare variables used to create HMAC
+    
     unsigned char tmp[32];
     const br_hash_class *digest_class = &br_sha256_vtable;
     br_hmac_key_context kc;
@@ -337,12 +341,14 @@ int verify_hmac(unsigned int hmac_index, unsigned int data_index, unsigned int d
     br_hmac_key_init(&kc, digest_class, HMAC_KEY, HMAC_SIZE);
     br_hmac_init(&ctx, &kc, 0);
     
+    // gets data used in HMAC
     unsigned char hmac_data[data_size];
     for (int i = 0; i < data_size; i++) {
-        hmac_data[i] = data[data_index];
-        data_index++;
+        hmac_data[i] = data[data_f_index];
+        data_f_index++;
     }
     
+    // gets the provided HMAC
     unsigned char hmac[HMAC_SIZE];
     for(int i = 0; i < HMAC_SIZE; i++){
         hmac[i] = data[hmac_index];
@@ -355,12 +361,32 @@ int verify_hmac(unsigned int hmac_index, unsigned int data_index, unsigned int d
     // write the calculated HMAC into tmp
     br_hmac_out(&ctx, tmp);
 
+    uart_write_str(UART2, "\ntmp: \n");
+    uint32_t a;
+    
+    for(int i = 0; i < HMAC_SIZE; i+=4) {
+        a = tmp[i] << 24;
+        a |= tmp[i+1] << 16;
+        a |= tmp[i+2] << 8;
+        a |= tmp[i+3];
+        uart_write_hex(UART2, a);
+    }
+    
+    uart_write_str(UART2, "\nhmac: \n");
+    for(int i = 0; i < HMAC_SIZE; i+=4) {
+        a = hmac[i] << 24;
+        a |= hmac[i+1] << 16;
+        a |= hmac[i+2] << 8;
+        a |= hmac[i+3];
+        uart_write_hex(UART2, a);
+    }
+    
     // loop through each element of hmac and tmp and test if they are the same
     if (is_same(hmac, tmp)) {
-        uart_write_str(UART2, "HMAC is Valid");
+        uart_write_str(UART2, "\nHMAC is Valid\n");
         return 1;
     } else {
-        uart_write_str(UART2, "HMAC is Invalid");
+        uart_write_str(UART2, "\nHMAC is Invalid\n");
     }
     return 0;  
 }
