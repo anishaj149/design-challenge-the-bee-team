@@ -26,7 +26,7 @@ void load_firmware(void);
 void boot_firmware(void);
 long program_flash(uint32_t, unsigned char*, unsigned int);
 int verify_hmac(unsigned int hmac_index, unsigned int data_index, unsigned int data_size);
-int is_same(unsigned char* hmac, unsigned char* tmp);
+int is_same(unsigned char* hmac, unsigned char* tmp, unsigned int data_size);
 int decrypt_firmware(unsigned char* iv, unsigned char* data, unsigned short DATA_LEN);
 
 // Firmware Constants
@@ -194,11 +194,11 @@ void load_firmware(void)
   }
 
   //HMAC verification for metadata
-  if(!verify_hmac(4, 0, 4)){
-        uart_write(UART1, ERROR_HMAC); // Reject the firmware
-        SysCtlReset(); // Reset device
-        return;
-    }
+//   if(!verify_hmac(4, 0, 4)){
+//         uart_write(UART1, ERROR_HMAC); // Reject the firmware
+//         SysCtlReset(); // Reset device
+//         return;
+//     }
 
   // Compare to old version and abort if older (note special case for version 0).
   uint16_t old_version = *fw_version_address;  
@@ -359,19 +359,31 @@ int verify_hmac(unsigned int hmac_index, unsigned int data_f_index, unsigned int
     br_hmac_key_context kc;
     br_hmac_context ctx;
     
+    unsigned char key[32];
+    memcpy(key, HMAC_KEY, 32);
+    
     // Initialize the HMAC key and HMAC
-    br_hmac_key_init(&kc, digest_class, HMAC_KEY, HMAC_SIZE);
+    br_hmac_key_init(&kc, digest_class, key, HMAC_SIZE);
     br_hmac_init(&ctx, &kc, 0);
     
     // gets data used in HMAC
     unsigned char hmac_data[data_size];
+    nl(UART2);
     for (int i = 0; i < data_size; i++) {
-        hmac_data[i] = data[data_f_index];
+        hmac_data[i] = data[data_f_index];   
         data_f_index++;
     }
-    nl(UART2);
-    uart_write_str(UART2, "data_f_index : ");
-    uart_write_hex(UART2, data_f_index);
+    
+    uint32_t a;
+
+    for(int i = 0; i < sizeof(hmac_data); i+=4) {
+            a = hmac_data[i] << 24;
+            a |= hmac_data[i+1] << 16;
+            a |= hmac_data[i+2] << 8;
+            a |= hmac_data[i+3];
+            uart_write_hex(UART2, a);
+        }     
+    
     nl(UART2);
     // gets the provided HMAC
     unsigned char hmac[HMAC_SIZE];
@@ -379,8 +391,15 @@ int verify_hmac(unsigned int hmac_index, unsigned int data_f_index, unsigned int
         hmac[i] = data[hmac_index];
         hmac_index++;
     }
-    uart_write_str(UART2, "hmac_index: ");
-    uart_write_hex(UART2, hmac_index);
+    
+    for(int i = 0; i < sizeof(hmac); i+=4) {
+            a = hmac[i] << 24;
+            a |= hmac[i+1] << 16;
+            a |= hmac[i+2] << 8;
+            a |= hmac[i+3];
+            uart_write_hex(UART2, a);
+        } 
+    
     nl(UART2);
     
     // add data to be inside the HMAC
@@ -390,7 +409,6 @@ int verify_hmac(unsigned int hmac_index, unsigned int data_f_index, unsigned int
     br_hmac_out(&ctx, tmp);
 
     uart_write_str(UART2, "\ntmp: \n");
-    uint32_t a;
     
     for(int i = 0; i < HMAC_SIZE; i+=4) {
         a = tmp[i] << 24;
@@ -410,7 +428,7 @@ int verify_hmac(unsigned int hmac_index, unsigned int data_f_index, unsigned int
     }
     
     // loop through each element of hmac and tmp and test if they are the same
-    if (is_same(hmac, tmp)) {
+    if (is_same(hmac, tmp, data_size)) {
         uart_write_str(UART2, "\nHMAC is Valid\n");
         return 1;
     } else {
@@ -453,15 +471,13 @@ int decrypt_firmware(char* iv, char* key, unsigned short KEY_LEN, char* data, un
 }
 
 // method checks if the given and calculated HMACs are the same
-int is_same(unsigned char* hmac, unsigned char* tmp) {
+int is_same(unsigned char* hmac, unsigned char* tmp, unsigned int data_size) {
     int size = 0;
     // get the HMAC with the greater size (tho they should be the same length ya never know)
-    if (sizeof(hmac) < sizeof(tmp)) {
-        size = sizeof(hmac);
-        size /= sizeof(hmac[0]);
+    if (HMAC_SIZE < data_size) {
+        size = HMAC_SIZE;
     } else {
-        size = sizeof(tmp);
-        size /= sizeof(tmp[0]);
+        size = data_size;
     }
     
     int equal = 1; // equals 0 when hmac and tmp are equal

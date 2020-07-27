@@ -23,7 +23,7 @@ def protect_firmware(infile, outfile, version, message):
     enc_firmware_iv = cbc_encryption(firmware)
     
     # Pack version and size (of only the firmware!) into two little-endian shorts
-    metadata = struct.pack('<HH', version, len(firmware)) # is the plaintext the same length as the cipher text???
+    metadata = struct.pack('<HH', version, len(firmware)) # is the plaintext the same length as the cipher text??? --> NO --> change it to len(enc_firmware_iv) - IV_SIZE
     
     # Append null-terminated release message to end of firmware
     firmware_iv_message = enc_firmware_iv + message.encode() + b'\00'
@@ -55,11 +55,10 @@ def cbc_encryption(firmware):
     #Append IVs to the end of the ciphertext
     #128 bit IV
     with open(bootloader/'secret_build_output.txt','rb') as fp:
-        key = fp.readlines()  #Returns a list. Each line is an index in the list.
-        key = key[-2]  #key should be 16 bytes long. 
+        key = fp.read()  #Returns a list. Each line is an index in the list.
+        key = key[0:16]  #key should be 16 bytes long. 
         #The keys are generated with one line being CBC and the next line being HMAC
         #The CBC key will be the second to last item in the list.
-        key = key.rstrip()  #removes any possible newlines 
         
     cipher = AES.new(key, AES.MODE_CBC)  #makes a cipher object with a random IV
     
@@ -80,8 +79,8 @@ def hmac_generation(input_thing):
     
     #reading in a key from the secret file
     with open(bootloader/'secret_build_output.txt', "rb") as f:
-        key_list = f.readlines()
-    key = key_list[-1].rstrip()
+        key_list = f.read()
+    key = key_list[16:48]
     
     #generates a new hmac object
     h = HMAC.new(key, digestmod=SHA256)

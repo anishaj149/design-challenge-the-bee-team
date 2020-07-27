@@ -105,7 +105,9 @@ def main(ser, infile, debug):
     #sending the rest of the data
     for idx, frame_start in enumerate(range(0, len(firmware_and_hmacs), FRAME_SIZE)):
         data = firmware_and_hmacs[frame_start: frame_start + FRAME_SIZE]
-
+        
+        print(data[0:32].hex())
+        print(data[32:].hex())
         # Get length of data.
         length = len(data)
         frame_fmt = '>H{}s'.format(length)
@@ -121,8 +123,6 @@ def main(ser, infile, debug):
         #hmac = firmware_and_hmacs[frame_start + FRAME_SIZE - HMAC_SIZE: frame_start + FRAME_SIZE]
         #send_hmac(ser, hmac, debug-debug)
         
-    print("Done writing firmware.")
-
     # Send a zero length payload to tell the bootloader to finish writing its page.
     ser.write(struct.pack('>H', 0x0000))
 
@@ -131,10 +131,12 @@ def main(ser, infile, debug):
     frame_fmt = '>H{}s'.format(length)
     frame = struct.pack(frame_fmt, length, hmac)
     
+    send_frame(ser, frame, debug=debug)
+    
     if debug:
             print("Writing frame {} ({} bytes)...".format(idx, len(frame)))
     
-    send_frame(ser, frame, debug=debug)
+    print("Done writing firmware.")
     
     return ser
 
