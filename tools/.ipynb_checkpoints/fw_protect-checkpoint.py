@@ -23,7 +23,7 @@ def protect_firmware(infile, outfile, version, message):
     enc_firmware_iv = cbc_encryption(firmware)
     
     # Pack version and size (of only the firmware!) into two little-endian shorts
-    metadata = struct.pack('<HH', version, len(firmware))
+    metadata = struct.pack('<HH', version, len(firmware)) # is the plaintext the same length as the cipher text???
     
     # Append null-terminated release message to end of firmware
     firmware_iv_message = enc_firmware_iv + message.encode() + b'\00'
@@ -76,18 +76,18 @@ def cbc_encryption(firmware):
     
     return final_encrypt  #returns CBC encryption
     
-def hmac_generation(input):
+def hmac_generation(input_thing):
     
     #reading in a key from the secret file
     with open(bootloader/'secret_build_output.txt', "rb") as f:
         key_list = f.readlines()
-    key = key_list[1].rstrip()
+    key = key_list[-1].rstrip()
     
     #generates a new hmac object
     h = HMAC.new(key, digestmod=SHA256)
     
     #makes an hmac for the unencrypted metadata and the encrypted firmware
-    h.update(input)
+    h.update(input_thing)
     
     
     

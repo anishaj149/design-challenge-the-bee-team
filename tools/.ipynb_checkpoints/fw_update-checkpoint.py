@@ -26,9 +26,9 @@ from serial import Serial
 
 RESP_OK = b'\x00'
 HMAC_SIZE = 32
-FRAME_SIZE = 32 + HMAC_SIZE #firmware frame size plus indiv hmac for each thing
+FRAME_SIZE = 64 #firmware frame size plus indiv hmac for each thing
 
-error_dct = {b'\0x1': 'HMAC is not verifiable', b'\0x2':'Version is wrong', b'\0x3':'Not enough space in flash'}
+error_dct = {b'\x02': 'HMAC is not verifiable', b'\x01':'Version is wrong', b'\x03':'Not enough space in flash'}
 
 def send_metadata(ser, metadata, metadata_HMAC, debug=False):
     version, size = struct.unpack_from('<HH', metadata)
@@ -62,18 +62,16 @@ def send_metadata(ser, metadata, metadata_HMAC, debug=False):
                            
 def send_frame(ser, frame, debug=False):
     ser.write(frame)  # Write the frame...
-    
-    print(frame)
-    
+        
     if debug:
         print(frame)
 
-    resp = ser.read()  # Wait for an OK from the bootloader that it was able to go to flash or that hmac did verify
-
-    #time.sleep(0.1)
+    resp = ser.read()  # Wait for an OK from the bootloader that it was able to go to flash or that hmac did verify    
+    time.sleep(0.1)
     
-    #if resp != RESP_OK:
-    #    raise RuntimeError("ERROR: Bootloader responded with {}".format(error_dct[resp]))#repr(resp)))
+    if resp != RESP_OK:
+        raise RuntimeError("ERROR: Bootloader responded with {}".format(error_dct[resp]))#repr(resp)))
+    
 
     #if debug:
     #    print("Resp: {}".format(error_dct[resp]))#ord(resp)))
@@ -98,7 +96,7 @@ def main(ser, infile, debug):
     #splitting data up
     metadata = firmware_blob[:4] 
     metadata_HMAC = firmware_blob[4: 4+ HMAC_SIZE] #need to send the hmac for the version for InTeGrItY
-    firmware_and_hmacs = firmware_blob[HMAC_SIZE + 4:-32] # error on this line
+    firmware_and_hmacs = firmware_blob[HMAC_SIZE + 4:-32]
     hmac = firmware_blob[-32:]
     
     #sending metadata
@@ -106,7 +104,7 @@ def main(ser, infile, debug):
               
     #sending the rest of the data
     for idx, frame_start in enumerate(range(0, len(firmware_and_hmacs), FRAME_SIZE)):
-        data = firmware_and_hmacs[frame_start: frame_start + FRAME_SIZE - HMAC_SIZE]
+        data = firmware_and_hmacs[frame_start: frame_start + FRAME_SIZE]
 
         # Get length of data.
         length = len(data)
@@ -120,8 +118,8 @@ def main(ser, infile, debug):
 
         send_frame(ser, frame, debug=debug)
         
-        hmac = firmware_and_hmacs[frame_start + FRAME_SIZE - HMAC_SIZE: frame_start + FRAME_SIZE]
-        send_hmac(ser, hmac, debug-debug)
+        #hmac = firmware_and_hmacs[frame_start + FRAME_SIZE - HMAC_SIZE: frame_start + FRAME_SIZE]
+        #send_hmac(ser, hmac, debug-debug)
         
     print("Done writing firmware.")
 

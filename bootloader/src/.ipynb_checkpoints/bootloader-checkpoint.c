@@ -152,6 +152,7 @@ void load_initial_firmware(void) {
  */
 void load_firmware(void)
 {
+    // declaring variables
   int frame_length = 0;
   int read = 0;
   uint32_t rcv = 0;
@@ -182,15 +183,15 @@ void load_firmware(void)
   uart_write_hex(UART2, size);
   nl(UART2);
     
-  uart_write(UART1, OK);
-    // get HMAC of metadata
+  uart_write(UART1, OK); // send ok to update tool after receiving metadata
+    
+  // get HMAC of metadata
   // Get the number of bytes specified 
   data_index = 4; //need to start at 4 because of the metadata len
   for (int i = 0; i < HMAC_SIZE; ++i){
     data[data_index] = uart_read(UART1, BLOCKING, &read);
     data_index += 1;
   }
-  //uart_write(UART1, OK);
 
   //HMAC verification for metadata
   if(!verify_hmac(4, 0, 4)){
@@ -216,10 +217,30 @@ void load_firmware(void)
   program_flash(METADATA_BASE, (uint8_t*)(&metadata), 4);
   fw_release_message_address = (uint8_t *) (FW_BASE + size);
 
-  uart_write(UART1, OK); // Acknowledge the metadata.
+  uart_write(UART1, OK); // Acknowledge the metadata's HMAC
 
   data_index = 0; //resetting data[]
 
+//     // THIS IS ALL TEST CODE THAT WILL BE DELETED LATER
+//     rcv = uart_read(UART1, BLOCKING, &read);
+//     frame_length = (int)rcv << 8;
+//     rcv = uart_read(UART1, BLOCKING, &read);
+//     frame_length += (int)rcv;
+    
+//     for(int i = 0; i < 32; i++) {
+//       data[i] = uart_read(UART1, BLOCKING, &read);
+//     }
+//     for(int i = 32; i < 64; i++) {
+//       data[i] = uart_read(UART1, BLOCKING, &read);
+//     }
+    
+//     if(!verify_hmac(32, 0, 32)){ //beginning of data, beginning of hmac
+//         uart_write(UART1, ERROR_HMAC); // Reject the firmware
+//         SysCtlReset(); // Reset device
+//         return;
+//     }
+//     uart_write(UART1, OK);
+    
   /* Loop here until you can get all your characters and stuff */
   while (1) {
 
@@ -253,7 +274,7 @@ void load_firmware(void)
      // if
       
     // Get the number of bytes specified
-    for (int i = 0; i < frame_length; ++i){
+    for (int i = 0; i < frame_length; i++){
         data[data_index] = uart_read(UART1, BLOCKING, &read);
         data_index += 1;
     } //for
@@ -266,10 +287,6 @@ void load_firmware(void)
     }
     //discard hmac so only fw will go to flash (this is the end of the IV frame)
     data_index -= HMAC_SIZE;
-    nl(UART2);
-    uart_write_str(UART2, (char *)data_index);
-    nl(UART2);
-
     
     uart_write(UART1, OK); // Acknowledge the frame.
   }
@@ -278,9 +295,11 @@ void load_firmware(void)
 
     unsigned char just_data[size];
     // separate data and IV from data[]
+    int j = 0;
     for (int i = 0; i < size + IV_SIZE; i++) {
         if (i >= size) {
-            iv[i] = data[i];
+            iv[j] = data[i];
+            j++;
         } else {
             just_data[i] = data[i];
         }
@@ -290,8 +309,7 @@ void load_firmware(void)
 //Now, data has all of the firmware, so we are going to put it all into flash. 
     //while(1){
     // If we filed our page buffer, program it
-    int i;
-    for(i = 0; i < size - IV_SIZE; i += FLASH_PAGESIZE){
+    for(int i = 0; i < size; i += FLASH_PAGESIZE){
       if (program_flash(page_addr, data, i)){
         uart_write(UART1, ERROR_FLASH); // Reject the firmware
         SysCtlReset(); // Reset device
@@ -311,8 +329,8 @@ void load_firmware(void)
 
     } // for
     
-    if((size - IV_SIZE) % FLASH_PAGESIZE){ //remainder in case there wasnt exactly % 1000
-    if (program_flash(page_addr, data, size - IV_SIZE)){
+    if(size % FLASH_PAGESIZE){ //remainder in case there wasnt exactly % 1000
+    if (program_flash(page_addr, data, size)){
         uart_write(UART1, ERROR_FLASH); // Reject the firmware
         SysCtlReset(); // Reset device
         return;
@@ -351,13 +369,19 @@ int verify_hmac(unsigned int hmac_index, unsigned int data_f_index, unsigned int
         hmac_data[i] = data[data_f_index];
         data_f_index++;
     }
-    
+    nl(UART2);
+    uart_write_str(UART2, "data_f_index : ");
+    uart_write_hex(UART2, data_f_index);
+    nl(UART2);
     // gets the provided HMAC
     unsigned char hmac[HMAC_SIZE];
     for(int i = 0; i < HMAC_SIZE; i++){
         hmac[i] = data[hmac_index];
         hmac_index++;
     }
+    uart_write_str(UART2, "hmac_index: ");
+    uart_write_hex(UART2, hmac_index);
+    nl(UART2);
     
     // add data to be inside the HMAC
     br_hmac_update(&ctx, hmac_data, data_size);
@@ -441,9 +465,10 @@ int is_same(unsigned char* hmac, unsigned char* tmp) {
     }
     
     int equal = 1; // equals 0 when hmac and tmp are equal
+    int useless = 0;
     for (int i = 0; i < size; i++) {
         if (*(hmac + i) == *(tmp + i)) {
-            equal = 1; // set to a number for security --> time/power?
+            useless = 1; // set to a number for security --> time/power
         } else {
             equal = 0;
         }
