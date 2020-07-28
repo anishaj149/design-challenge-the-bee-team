@@ -23,11 +23,10 @@ def protect_firmware(infile, outfile, version, message):
     enc_firmware_iv = cbc_encryption(firmware)
     
     # Pack version and size (of only the firmware!) into two little-endian shorts
-    metadata = struct.pack('<HH', version, len(firmware)) # is the plaintext the same length as the cipher text??? --> NO --> change it to len(enc_firmware_iv) - IV_SIZE
+    metadata = struct.pack('<HH', version, len(enc_firmware_iv) - 16)
     
     # Append null-terminated release message to end of firmware
     firmware_iv_message = enc_firmware_iv + message.encode() + b'\00'
-    print("MESSAGE LEN: ", len(message.encode()))
 
     firmware_iv_message = pad(firmware_iv_message, 32)
 
@@ -48,24 +47,17 @@ def protect_firmware(infile, outfile, version, message):
     else:
         half = len(firmware_iv_message)/2
     half = int(half)
-    print(half)
     
     hmac_1_2 = hmac_generation(firmware_iv_message[0:half])
-    print("START")
-    print(firmware_iv_message[0:half].hex())
-    print("END OF MESSAGE")
     hmac_1_2 += hmac_generation(firmware_iv_message[half:])
-    
+
     firmware_blob += hmac_1_2
-    print(hmac_1_2.hex())
     firmware_blob += hmac_generation(hmac_1_2)
     
     # Write firmware blob to outfile
     with open(outfile, 'wb+') as outfile:
         outfile.write(firmware_blob)
     
-    
-
 def cbc_encryption(firmware):
     #Firmware format is just the firmware. The size and release message are to be added later. 
     #mode is aes-128

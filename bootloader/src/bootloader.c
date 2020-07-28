@@ -243,9 +243,9 @@ void load_firmware(void)
         data_index += 1;
         }
         
-        int half = (size + IV_SIZE)/2;
+        int half = (size + IV_SIZE+24+28)/2;
         
-        if(!verify_hmac(data_index - HMAC_SIZE*2, 0, half) || !verify_hmac(data_index - HMAC_SIZE, half, (size + IV_SIZE) - half)){ //beginning of data, beginning of hmac
+        if(!verify_hmac(data_index - HMAC_SIZE*2, 0, half) || !verify_hmac(data_index - HMAC_SIZE, half, (size + IV_SIZE) - half + 52)){ //beginning of data, beginning of hmac
             uart_write(UART1, ERROR_HMAC); // Reject the firmware
             SysCtlReset(); // Reset device
             return;
