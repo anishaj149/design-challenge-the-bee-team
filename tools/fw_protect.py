@@ -27,6 +27,7 @@ def protect_firmware(infile, outfile, version, message):
     
     # Append null-terminated release message to end of firmware
     firmware_iv_message = enc_firmware_iv + message.encode() + b'\00'
+    print("MESSAGE LEN: ", len(message.encode()))
 
     firmware_iv_message = pad(firmware_iv_message, 32)
 
@@ -40,7 +41,24 @@ def protect_firmware(infile, outfile, version, message):
         firmware_blob += hmac_generation(firmware_iv_message[i: i+32])
     
     #appends an hmac of all the *data* onto the very end of the entire firmware blob
-    firmware_blob += hmac_generation(firmware_iv_message)
+    #firmware_blob += hmac_generation(firmware_iv_message)
+    
+    if(len(firmware_iv_message) % 2 != 0):
+        half = (len(firmware_iv_message)-1)/2
+    else:
+        half = len(firmware_iv_message)/2
+    half = int(half)
+    print(half)
+    
+    hmac_1_2 = hmac_generation(firmware_iv_message[0:half])
+    print("START")
+    print(firmware_iv_message[0:half].hex())
+    print("END OF MESSAGE")
+    hmac_1_2 += hmac_generation(firmware_iv_message[half:])
+    
+    firmware_blob += hmac_1_2
+    print(hmac_1_2.hex())
+    firmware_blob += hmac_generation(hmac_1_2)
     
     # Write firmware blob to outfile
     with open(outfile, 'wb+') as outfile:

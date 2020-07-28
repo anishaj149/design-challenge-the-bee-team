@@ -80,7 +80,6 @@ unsigned char iv [IV_SIZE];
 char CBC_KEY[] = CBC;
 char HMAC_KEY[] = HMAC;
 
-
 int main(void) {
 
   // Initialize UART channels
@@ -152,7 +151,7 @@ void load_initial_firmware(void) {
  */
 void load_firmware(void)
 {
-    // declaring variables
+    // declaring variables    
   int frame_length = 0;
   int read = 0;
   uint32_t rcv = 0;
@@ -237,18 +236,38 @@ void load_firmware(void)
     //if the done message is sent, finish
     if (frame_length == 0) {
         uart_write(UART1, OK);
-        //get HMAC of entire data 
+        
+        //get HMACs Part 1 and 2 of entire data 
+        for (int i = 0; i < HMAC_SIZE*2; ++i){
+        data[data_index] = uart_read(UART1, BLOCKING, &read);
+        data_index += 1;
+        }
+        
+        int half = (size + IV_SIZE+62)/2;
+        
+        if(!verify_hmac(data_index - HMAC_SIZE*2, 0, half) || !verify_hmac(data_index - HMAC_SIZE, half, (size + IV_SIZE) - half)){ //beginning of data, beginning of hmac
+            uart_write(UART1, ERROR_HMAC); // Reject the firmware
+            SysCtlReset(); // Reset device
+            return;
+        }
+        uart_write(UART1, OK);
+        
+        // get HMAC of HMACs Part1 and Part2
+        
         for (int i = 0; i < HMAC_SIZE; ++i){
         data[data_index] = uart_read(UART1, BLOCKING, &read);
         data_index += 1;
         }
         
-        if(!verify_hmac(data_index - HMAC_SIZE, 0, size + IV_SIZE)){ //beginning of data, beginning of hmac
+        if(!verify_hmac(data_index - HMAC_SIZE, data_index - HMAC_SIZE*3, HMAC_SIZE*2)) {
             uart_write(UART1, ERROR_HMAC); // Reject the firmware
             SysCtlReset(); // Reset device
             return;
         }
-        data_index -= HMAC_SIZE; // we don't want to include this final hmac in the data, either. 
+        uart_write(UART2, OK);
+        
+        data_index -= HMAC_SIZE*3; // we don't want to include these hmacs in the data, either. 
+        
         break;
       }
      // if
@@ -333,6 +352,15 @@ void load_firmware(void)
 // everything is currently hard-coded
 int verify_hmac(unsigned int hmac_index, unsigned int data_f_index, unsigned int data_size) {    
     // declare variables used to create HMAC
+    
+    if (data_size > 64) {
+        nl(UART2);
+        uart_write_str(UART2, "Data Size: ");
+        uart_write_hex(UART2, data_size);
+        nl(UART2);
+        //data_size /= 1.2;
+        uart_write_str(UART2, "THE LAST HMAC");
+    }
     uint32_t a;
 
     unsigned char tmp[32];
@@ -340,14 +368,14 @@ int verify_hmac(unsigned int hmac_index, unsigned int data_f_index, unsigned int
     br_hmac_key_context kc;
     br_hmac_context ctx;
     
+    nl(UART2);
+        
     unsigned char key[32];
     memcpy(key, HMAC_KEY, 32);
     
-    nl(UART2);
-        
-    for (int i = 0; i < 32; i++) {
-        key[i] = 0x30;
-    }
+//     for (int i = 0; i < 32; i++) {
+//         key[i] = 0x30;
+//     }
     
     for(int i = 0; i < sizeof(key); i+=4) {
             a = key[i] << 24;
@@ -370,7 +398,8 @@ int verify_hmac(unsigned int hmac_index, unsigned int data_f_index, unsigned int
         hmac_data[i] = data[data_f_index];   
         data_f_index++;
     }
-    
+    uart_write_hex(UART2, sizeof(hmac_data));
+    nl(UART2);
 
     for(int i = 0; i < sizeof(hmac_data); i+=4) {
         a = hmac_data[i] << 24;
@@ -400,9 +429,13 @@ int verify_hmac(unsigned int hmac_index, unsigned int data_f_index, unsigned int
     
     uart_write_str(UART2, "About to update HMAC");
     nl(UART2);
+    uart_write_hex(UART2, data_size);
+    nl(UART2);
     // add data to be inside the HMAC
     br_hmac_update(&ctx, hmac_data, data_size);
     
+    uart_write_str(UART2, "Updated the HMAC");
+    nl(UART2);
     // write the calculated HMAC into tmp
     br_hmac_out(&ctx, tmp);
 

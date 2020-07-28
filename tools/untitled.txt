@@ -1,0 +1,16 @@
+In terminal 1:
+in the tools directory
+```python bl_build.py```
+```python bl_emulate.py```
+
+In terminal 2:
+in the tools directory
+```python fw_protect.py --infile ../firmware/firmware/gcc/main.bin --outfile firmwareblob.blob --version 4 --message "if you see this you win!"```
+```python fw_update.py --port /embsec/UART1 --firmware ./firmwareblob.blob```
+
+In terminal 3:
+```python -m serial.tools.miniterm /embsec/UART0```
+
+In terminal 4:
+```python -m serial.tools.miniterm /embsec/UART2```
+

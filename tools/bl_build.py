@@ -49,10 +49,10 @@ def make_bootloader():
     return (status == 0)
 
 def gen_keys():  #Have to generate one CBC key and one HMAC key
-    #cbc_key = secrets.token_bytes(16)  #generates a key of 16 bytes for CBC
-    #hmac_key = secrets.token_bytes(32) #Generates a key of 32 bytes for HMAC
-    cbc_key = b"0"*16
-    hmac_key = b"0"*32
+    cbc_key = secrets.token_bytes(16)  #generates a key of 16 bytes for CBC
+    hmac_key = secrets.token_bytes(32) #Generates a key of 32 bytes for HMAC
+    #cbc_key = b"0"*16
+    #hmac_key = b"0"*32
     assert len(cbc_key) == 16
     assert len(hmac_key) == 32
     with open('secret_build_output.txt','wb+') as fp:  #Opens the file which stores keys
