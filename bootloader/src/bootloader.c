@@ -43,6 +43,7 @@ int decrypt_firmware(unsigned char* iv, unsigned char* data, unsigned short DATA
 #define ERROR_META ((unsigned char)0x01)
 #define ERROR_HMAC ((unsigned char)0x02)
 #define ERROR_FLASH ((unsigned char)0x03)
+#define ERROR_RELEASE_MESSAGE ((unsigned char)0x04)
 #define UPDATE ((unsigned char)'U')
 #define BOOT ((unsigned char)'B')
 
@@ -79,6 +80,8 @@ unsigned char iv [IV_SIZE];
 //Define keys
 char CBC_KEY[] = CBC;
 char HMAC_KEY[] = HMAC;
+
+char release_message[1024]; // 100 is the release message limit
 
 int main(void) {
 
@@ -134,7 +137,7 @@ void load_initial_firmware(void) {
   int size = (int)&_binary_firmware_bin_size;
   int *data = (int *)&_binary_firmware_bin_start;
     
-  uint16_t version = 2; // is this supposed to be version 1?
+  uint16_t version = 2;
   uint32_t metadata = (((uint16_t) size & 0xFFFF) << 16) | (version & 0xFFFF);
   program_flash(METADATA_BASE, (uint8_t*)(&metadata), 4);
   fw_release_message_address = (uint8_t *) "This is the initial release message.";
@@ -160,6 +163,7 @@ void load_firmware(void)
   uint32_t page_addr = FW_BASE;
   uint32_t version = 0;
   uint32_t size = 0;
+  uint32_t release_message_len = 0;
 
   // Get version.
   data[0] = uart_read(UART1, BLOCKING, &read);
@@ -173,7 +177,12 @@ void load_firmware(void)
   data[3] = uart_read(UART1, BLOCKING, &read);
   size |= (uint32_t)data[3] << 8;
 
-            
+  // Get Release Message Size.
+  data[4] = uart_read(UART1, BLOCKING, &read);
+  release_message_len = (uint32_t)data[4];
+  data[5] = uart_read(UART1, BLOCKING, &read);
+  release_message_len |= (uint32_t)data[5] << 8;
+    
   // confirmation messages
   uart_write_str(UART2, "Received Firmware Version: ");
   uart_write_hex(UART2, version);
@@ -181,19 +190,22 @@ void load_firmware(void)
   uart_write_str(UART2, "Received Firmware Size: ");
   uart_write_hex(UART2, size);
   nl(UART2);
+  uart_write_str(UART2, "Received Release Message Length: ");
+  uart_write_hex(UART2, release_message_len);
+  nl(UART2);
     
   uart_write(UART1, OK); // send ok to update tool after receiving metadata
     
   // get HMAC of metadata
   // Get the number of bytes specified 
-  data_index = 4; //need to start at 4 because of the metadata len
+  data_index = 6; //need to start at 4 because of the metadata len
   for (int i = 0; i < HMAC_SIZE; ++i){
     data[data_index] = uart_read(UART1, BLOCKING, &read);
     data_index += 1;
   }
 
   //HMAC verification for metadata
-  if(!verify_hmac(4, 0, 4)){
+  if(!verify_hmac(6, 0, 6)){
         uart_write(UART1, ERROR_HMAC); // Reject the firmware
         SysCtlReset(); // Reset device
         return;
@@ -208,15 +220,21 @@ void load_firmware(void)
   } else if (version == 0) {
     // If debug firmware, don't change version
     version = old_version;
-  }
+  } 
     
+    // Check if release message is greater than 1kB
+  if (release_message_len > 1024) {
+      uart_write_hex(UART2, release_message_len);
+    uart_write(UART1, ERROR_RELEASE_MESSAGE); // Reject the metadata.
+    SysCtlReset(); // Reset device
+      return;
+  }
+
   // Write new firmware size and version to Flash
   // Create 32 bit word for flash programming, version is at lower address, size is at higher address
   uint32_t metadata = ((size & 0xFFFF) << 16) | (version & 0xFFFF);
   program_flash(METADATA_BASE, (uint8_t*)(&metadata), 4);
-  fw_release_message_address = (uint8_t *) (FW_BASE + size);
-
-  uart_write_str(UART2, (char *) fw_release_message_address);
+//   fw_release_message_address = (uint8_t *) (FW_BASE + size+IV_SIZE);
     
   uart_write(UART1, OK); // Acknowledge the metadata's HMAC
 
@@ -295,7 +313,7 @@ void load_firmware(void)
 //get all parts necessary for decrypt firmware
 //decrypt_firmware
 
-    unsigned char just_data[size]; // its JUST DATA!!!! D:<
+    unsigned char just_data[size]; // its JUST DATA!!!! D:< no HMACs at the end
     // separate data and IV from data[]
     int j = 0;
     for (int i = 0; i < size + IV_SIZE; i++) {
@@ -306,6 +324,14 @@ void load_firmware(void)
             just_data[i] = data[i];
         }
     }
+    
+    // FIND THAT RELEASE MESSAGE!!!!
+    j = 0;
+    for (int i = size+IV_SIZE; i < size+IV_SIZE+release_message_len; i++) {
+        release_message[j] = data[i];
+        j++;
+    }
+    
     decrypt_firmware(iv, just_data, size); //IV, key, key len, data, data len
 
 //Now, data has all of the firmware, so we are going to put it all into flash. 
@@ -390,10 +416,10 @@ int verify_hmac(unsigned int hmac_index, unsigned int data_f_index, unsigned int
     
     // loop through each element of hmac and tmp and test if they are the same
     if (is_same(hmac, tmp, data_size)) {
-        uart_write_str(UART2, "\nHMAC is Valid\n");
+        //uart_write_str(UART2, "\nHMAC is Valid\n");
         return 1;
     } else {
-        uart_write_str(UART2, "\nHMAC is Invalid\n");
+        //uart_write_str(UART2, "\nHMAC is Invalid\n");
     }
     return 0;  
 }
@@ -410,18 +436,7 @@ int decrypt_firmware(unsigned char* iv, unsigned char* data, unsigned short DATA
     vd->init(dc, CBC_KEY, CBC_KEY_LEN);
     vd->run(dc, iv, data, DATA_LEN);
     
-    //transmitting all the decoded data on UART2 for debugging purpuses
-    uart_write_str(UART2, "Unencrypted Data: ");
-    uint32_t a;
-    for(int i = 0; i < sizeof(data); i+=4) {
-        a = data[i] << 24;
-        a |= data[i+1] << 16;
-        a |= data[i+2] << 8;
-        a |= data[i+3];
-        uart_write_hex(UART2, a);
-    }
-    nl(UART2);
-    
+    //transmitting all the decoded data on UART2 for debugging purpuses  
     //Success!
     return 1;
 }
@@ -487,7 +502,7 @@ long program_flash(uint32_t page_addr, unsigned char *data, unsigned int data_le
 void boot_firmware(void)
 {
   nl(UART2);
-  uart_write_str(UART2, (char *) fw_release_message_address);
+  uart_write_str(UART2, (char *) release_message);
 
   // Boot the firmware
     __asm(

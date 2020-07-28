@@ -28,11 +28,11 @@ RESP_OK = b'\x00'
 HMAC_SIZE = 32
 FRAME_SIZE = 64 #firmware frame size plus indiv hmac for each thing
 
-error_dct = {b'\x02': 'HMAC is not verifiable', b'\x01':'Version is wrong', b'\x03':'Not enough space in flash'}
+error_dct = {b'\x01':'Version is wrong', b'\x02': 'HMAC is not verifiable', b'\x03':'Not enough space in flash', b'\x04':'Release Message is too big'}
 
 def send_metadata(ser, metadata, metadata_HMAC, debug=False):
-    version, size = struct.unpack_from('<HH', metadata)
-    print(f'Version: {version}\nSize: {size} bytes\n')
+    version, size, message = struct.unpack_from('<HHH', metadata)
+    print(f'Version: {version}\nSize: {size} bytes\nRelease Message Size: {message}\n')
 
     # Handshake for update
     ser.write(b'U')
@@ -94,15 +94,17 @@ def main(ser, infile, debug):
         firmware_blob = fp.read()
 
     #splitting data up
-    metadata = firmware_blob[:4] 
-    metadata_HMAC = firmware_blob[4: 4+ HMAC_SIZE] #need to send the hmac for the version for InTeGrItY
-    firmware_and_hmacs = firmware_blob[HMAC_SIZE + 4:-96]
+    metadata = firmware_blob[:6] 
+    metadata_HMAC = firmware_blob[6: 6+ HMAC_SIZE] #need to send the hmac for the version for InTeGrItY
+    firmware_and_hmacs = firmware_blob[HMAC_SIZE + 6:-96]
     hmacs = firmware_blob[-96:]
     
     #sending metadata
     send_metadata(ser, metadata, metadata_HMAC, debug=debug)
               
     #sending the rest of the data
+    #print(firmware_and_hmacs)
+    
     for idx, frame_start in enumerate(range(0, len(firmware_and_hmacs), FRAME_SIZE)):
         data = firmware_and_hmacs[frame_start: frame_start + FRAME_SIZE]
 

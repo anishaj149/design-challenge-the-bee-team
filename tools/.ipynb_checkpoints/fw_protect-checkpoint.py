@@ -23,10 +23,10 @@ def protect_firmware(infile, outfile, version, message):
     enc_firmware_iv = cbc_encryption(firmware)
     
     # Pack version and size (of only the firmware!) into two little-endian shorts
-    metadata = struct.pack('<HH', version, len(enc_firmware_iv) - 16)
+    metadata = struct.pack('<HHH', version, len(enc_firmware_iv) - 16, len(message))
     
     # Append null-terminated release message to end of firmware
-    firmware_iv_message = enc_firmware_iv + message.encode() + b'\00'
+    firmware_iv_message = enc_firmware_iv + message.encode() + b'\x00'
 
     firmware_iv_message = pad(firmware_iv_message, 32)
 
