@@ -43,7 +43,7 @@ def make_bootloader():
     
     key = gen_keys()  #Have to run this first so the keys are generated
         
-    status = subprocess.call(f'make CBC={to_c_array(key[0])} HMAC={to_c_array(key[1])}' , shell=True) #Makes us able to pass in commands make the key command anything you want. 
+    status = subprocess.call(f'make CBC={to_c_array(key[0])} HMAC={to_c_array(key[1])}' , shell=True) #Makes us able to pass in commands 
     
     # Return True if make returned 0, otherwise return False.
     return (status == 0)
@@ -53,7 +53,7 @@ def gen_keys():  #Have to generate one CBC key and one HMAC key
     hmac_key = secrets.token_bytes(32) #Generates a key of 32 bytes for HMAC
     #cbc_key = b"0"*16
     #hmac_key = b"0"*32
-    assert len(cbc_key) == 16
+    assert len(cbc_key) == 16  #Makes sure these lengths are defined.
     assert len(hmac_key) == 32
     with open('secret_build_output.txt','wb+') as fp:  #Opens the file which stores keys
         fp.write(cbc_key)  #Writes the cbc key
