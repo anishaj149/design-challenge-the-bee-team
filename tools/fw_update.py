@@ -67,7 +67,7 @@ def send_frame(ser, frame, debug=False):
         print(frame)
 
     resp = ser.read()  # Wait for an OK from the bootloader that it was able to go to flash or that hmac did verify    
-    time.sleep(0.1)
+    #time.sleep(0.1)
     
     if resp != RESP_OK:
         raise RuntimeError("ERROR: Bootloader responded with {}".format(error_dct[resp]))#repr(resp)))
@@ -105,9 +105,7 @@ def main(ser, infile, debug):
     #sending the rest of the data
     for idx, frame_start in enumerate(range(0, len(firmware_and_hmacs), FRAME_SIZE)):
         data = firmware_and_hmacs[frame_start: frame_start + FRAME_SIZE]
-        
-        #print(data[0:32].hex())
-        #print(data[32:].hex())
+
         # Get length of data.
         length = len(data)
         frame_fmt = '>H{}s'.format(length)
@@ -129,12 +127,8 @@ def main(ser, infile, debug):
     resp = ser.read()
     if resp != RESP_OK:
         raise RuntimeError("ERROR: Bootloader responded with {}".format(error_dct[resp]))#repr(resp)))
-    print(1)
 
     #Send hmacs part 1 and 2 
-    print("SENDING PART1 and PART2!!!\n")
-    print(hmacs[0:32].hex())
-    #print(hmacs[32:64].hex())
     ser.write(hmacs[0:64])
     
     resp = ser.read()  # Wait for an OK from the bootloader that it was able to go to flash or that hmac did verify    
@@ -144,9 +138,6 @@ def main(ser, infile, debug):
         raise RuntimeError("ERROR: Bootloader responded with {}".format(error_dct[resp]))#repr(resp)))
     
     # send the HMAC of hmacs
-    
-    print("SENDING FINAL HMAC!!!\n")
-    print(hmacs[64:])
     ser.write(hmacs[64:])
     
     resp = ser.read()  # Wait for an OK from the bootloader that it was able to go to flash or that hmac did verify    

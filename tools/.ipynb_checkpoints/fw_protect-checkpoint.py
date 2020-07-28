@@ -30,9 +30,8 @@ def protect_firmware(infile, outfile, version, message):
 
     firmware_iv_message = pad(firmware_iv_message, 32)
 
-    # Start the firmware blob with the metadata and the metadata's hmac  
+    # Start the firmware blob with the metadata and the metadata's hmac 
     firmware_blob = metadata + hmac_generation(metadata)
-    
     
     #takes 32 bytes of data, generates an hmac, and appends both to firmware_blob  
     for i in range(0, len(firmware_iv_message), 32):
@@ -48,10 +47,15 @@ def protect_firmware(infile, outfile, version, message):
         half = len(firmware_iv_message)/2
     half = int(half)
     
+    # Generate HMAC from first half of data
     hmac_1_2 = hmac_generation(firmware_iv_message[0:half])
+    #generate HMAC from second half of data
     hmac_1_2 += hmac_generation(firmware_iv_message[half:])
-
+    
+    # Add part 1 and 2 HMACs to data
     firmware_blob += hmac_1_2
+    
+    # Generate an HMAC of the part 1 and 2 HMACs
     firmware_blob += hmac_generation(hmac_1_2)
     
     # Write firmware blob to outfile
@@ -71,7 +75,6 @@ def cbc_encryption(firmware):
         #The CBC key will be the second to last item in the list.
         
     cipher = AES.new(key, AES.MODE_CBC)  #makes a cipher object with a random IV
-    
     ciphertext = cipher.encrypt(pad(firmware, AES.block_size)) 
     #encrypts the firmware and pads it so the firmware length is a multiple of 16 bytes
     
