@@ -4,10 +4,15 @@ Firmware Bundle-and-Protect Tool
 """
 import argparse
 import struct
+import pathlib
 
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad
 from Crypto.Hash import HMAC, SHA256
+
+
+FILE_DIR = pathlib.Path(__file__).parent.absolute()
+bootloader = FILE_DIR / '..' / 'bootloader'
 
 def protect_firmware(infile, outfile, version, message):
     # Load firmware binary from infile
@@ -17,11 +22,12 @@ def protect_firmware(infile, outfile, version, message):
     #encrypts the firmware w cbc mode aes-128, adds an iv to the end
     enc_firmware_iv = cbc_encryption(firmware)
     
-    # Pack version and size into two little-endian shorts
-    metadata = struct.pack('<HH', version, len(firmware))
+    # Pack version and size (of only the firmware!) into two little-endian shorts
+    metadata = struct.pack('<HH', version, len(firmware)) # is the plaintext the same length as the cipher text??? --> NO --> change it to len(enc_firmware_iv) - IV_SIZE
     
     # Append null-terminated release message to end of firmware
     firmware_iv_message = enc_firmware_iv + message.encode() + b'\00'
+    print("MESSAGE LEN: ", len(message.encode()))
 
     firmware_iv_message = pad(firmware_iv_message, 32)
 
@@ -30,12 +36,29 @@ def protect_firmware(infile, outfile, version, message):
     
     
     #takes 32 bytes of data, generates an hmac, and appends both to firmware_blob  
-    for i in range(0, len(firmware_iv_message), 32)
-        firmware_blob += firmware_iv_message[i, i+32]
-        firmware_blob += hmac_generation(firmware_iv_message[i, i+32])
+    for i in range(0, len(firmware_iv_message), 32):
+        firmware_blob += firmware_iv_message[i: i+32]
+        firmware_blob += hmac_generation(firmware_iv_message[i: i+32])
     
     #appends an hmac of all the *data* onto the very end of the entire firmware blob
-    firmware_blob += hmac_generation(firmware_iv_message)
+    #firmware_blob += hmac_generation(firmware_iv_message)
+    
+    if(len(firmware_iv_message) % 2 != 0):
+        half = (len(firmware_iv_message)-1)/2
+    else:
+        half = len(firmware_iv_message)/2
+    half = int(half)
+    print(half)
+    
+    hmac_1_2 = hmac_generation(firmware_iv_message[0:half])
+    print("START")
+    print(firmware_iv_message[0:half].hex())
+    print("END OF MESSAGE")
+    hmac_1_2 += hmac_generation(firmware_iv_message[half:])
+    
+    firmware_blob += hmac_1_2
+    print(hmac_1_2.hex())
+    firmware_blob += hmac_generation(hmac_1_2)
     
     # Write firmware blob to outfile
     with open(outfile, 'wb+') as outfile:
@@ -49,12 +72,11 @@ def cbc_encryption(firmware):
     #How do i read the key from the text file? Which key will it be?
     #Append IVs to the end of the ciphertext
     #128 bit IV
-    with open('secret_build_output.txt','rb') as fp:
-        key = fp.readlines()  #Returns a list. Each line is an index in the list.
-        key = key[-2]  #key should be 16 bytes long. 
+    with open(bootloader/'secret_build_output.txt','rb') as fp:
+        key = fp.read()  #Returns a list. Each line is an index in the list.
+        key = key[0:16]  #key should be 16 bytes long. 
         #The keys are generated with one line being CBC and the next line being HMAC
         #The CBC key will be the second to last item in the list.
-        key = key.rstrip()  #removes any possible newlines 
         
     cipher = AES.new(key, AES.MODE_CBC)  #makes a cipher object with a random IV
     
@@ -71,19 +93,19 @@ def cbc_encryption(firmware):
     
     return final_encrypt  #returns CBC encryption
     
-def hmac_generation(metadata, ciphertext):
+def hmac_generation(input_thing):
     
     #reading in a key from the secret file
-    with open("secret_build_output.txt", "rb") as f:
-        key_list = f.readlines()
-    key = key_list[1].rstrip()
+    with open(bootloader/'secret_build_output.txt', "rb") as f:
+        key_list = f.read()
+    key = key_list[16:48]
     
     #generates a new hmac object
     h = HMAC.new(key, digestmod=SHA256)
     
     #makes an hmac for the unencrypted metadata and the encrypted firmware
-    h.update(metadata)
-    h.update(ciphertext)
+    h.update(input_thing)
+    
     
     
     #returns that hmac
