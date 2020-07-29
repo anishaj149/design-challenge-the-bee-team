@@ -425,14 +425,13 @@ int verify_hmac(unsigned int hmac_index, unsigned int data_f_index, unsigned int
 }
 
 int decrypt_firmware(unsigned char* iv, unsigned char* data, unsigned short DATA_LEN) {
-    
     //all the AES CBC stuff
     const br_block_cbcdec_class * vd = &br_aes_big_cbcdec_vtable;
     br_aes_gen_cbcdec_keys v_dc;
     const br_block_cbcdec_class **dc;
     dc = &v_dc.vtable;
     
-    //decoding the stuff in place ???
+    //decoding the stuff in place 
     vd->init(dc, CBC_KEY, CBC_KEY_LEN);
     vd->run(dc, iv, data, DATA_LEN);
     
