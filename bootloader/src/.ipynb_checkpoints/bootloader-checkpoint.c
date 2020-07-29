@@ -138,7 +138,11 @@ void load_initial_firmware(void) {
   uint16_t version = 2;
   uint32_t metadata = (((uint16_t) size & 0xFFFF) << 16) | (version & 0xFFFF);
   program_flash(METADATA_BASE, (uint8_t*)(&metadata), 4);
-  fw_release_message_address = (uint8_t *) "This is the initial release message.";
+  char *initial_release_message = "This is the initial release message.";
+    
+    for (int i = 0; i < strlen(initial_release_message); i++) {
+        release_message[i] = initial_release_message[i];
+    }
     
   int i = 0;
   for (; i < size / FLASH_PAGESIZE; i++){
@@ -438,14 +442,13 @@ int verify_hmac(unsigned int hmac_index, unsigned int data_f_index, unsigned int
 
 // decrypts the firmware into the parameter it was passed
 int decrypt_firmware(unsigned char* iv, unsigned char* data, unsigned short DATA_LEN) {
-    
     //all the AES CBC stuff
     const br_block_cbcdec_class * vd = &br_aes_big_cbcdec_vtable;
     br_aes_gen_cbcdec_keys v_dc;
     const br_block_cbcdec_class **dc;
     dc = &v_dc.vtable;
     
-    //decoding the stuff in place ???
+    //decoding the stuff in place 
     vd->init(dc, CBC_KEY, CBC_KEY_LEN);
     vd->run(dc, iv, data, DATA_LEN);
     
