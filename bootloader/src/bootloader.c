@@ -138,7 +138,11 @@ void load_initial_firmware(void) {
   uint16_t version = 2;
   uint32_t metadata = (((uint16_t) size & 0xFFFF) << 16) | (version & 0xFFFF);
   program_flash(METADATA_BASE, (uint8_t*)(&metadata), 4);
-  fw_release_message_address = (uint8_t *) "This is the initial release message.";
+  char *initial_release_message = "This is the initial release message.";
+    
+    for (int i = 0; i < strlen(initial_release_message); i++) {
+        release_message[i] = initial_release_message[i];
+    }
     
   int i = 0;
   for (; i < size / FLASH_PAGESIZE; i++){
